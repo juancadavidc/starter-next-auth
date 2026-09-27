@@ -15,6 +15,10 @@ export function cached<Args extends unknown[], Result>(
   return unstable_cache(fn, keyParts, { tags });
 }
 
+// `{ expire: 0 }` expira el tag en el acto: la siguiente lectura ya ve el cambio (p. ej. un
+// admin cambia un rol o banea y la tabla se re-renderiza con el valor nuevo). Con un
+// perfil como "max" sería stale-while-revalidate y se vería el valor viejo una vez.
+// Sirve igual en server actions y en route handlers (`updateTag` solo en actions).
 export function invalidate(tag: string): void {
-  revalidateTag(tag, "max");
+  revalidateTag(tag, { expire: 0 });
 }

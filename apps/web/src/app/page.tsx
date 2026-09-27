@@ -14,7 +14,7 @@ export default async function HomePage() {
       <h1 className="text-4xl font-semibold tracking-tight">starter-next-auth</h1>
       <p className="text-muted-foreground">Una idea nueva, con login de Google desde el primer día.</p>
       <Button asChild size="lg">
-        <Link href="/login">Entrar</Link>
+        <Link href="/login">Entrar con Google</Link>
       </Button>
     </main>
   );
