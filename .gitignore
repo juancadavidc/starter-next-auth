@@ -12,6 +12,8 @@ next-env.d.ts
 apps/web/public/sw.js
 db-dumps/
 .DS_Store
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
 # <optional:landing>
 apps/landing/.astro/
 # </optional:landing>
