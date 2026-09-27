@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 #
-# Imagen de la app. La construye GitHub Actions y la publica en GHCR; Coolify solo hace
-# pull. Se construye desde la raíz del monorepo:
+# Imagen de la app. La construye GitHub Actions (job `publish` de .github/workflows/ci.yml,
+# solo si pasaron los checks) y la publica en GHCR; Coolify solo hace pull.
+# Se construye desde la raíz del monorepo:
 #   docker build -f docker/Dockerfile -t app .
 #
 # Debian slim y no Alpine: sharp y otros binarios nativos se resuelven contra glibc.

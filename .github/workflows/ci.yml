@@ -6,10 +6,13 @@ on:
   push:
     branches: [main]
 
+# En PR se cancela la corrida vieja; en main se encolan, para no cortar un push a GHCR
+# o un deploy a medias.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Mínimo por defecto; solo el job `publish` pide escribir paquetes.
 permissions:
   contents: read
 
@@ -112,3 +115,62 @@ jobs:
           done
           docker logs app
           exit 1
+
+  # Publicar y desplegar solo si todo lo anterior pasó, solo en push a main y nunca desde
+  # el repo de la plantilla (sus pushes no deben publicar una imagen ni desplegar).
+  publish:
+    name: Publicar imagen en GHCR
+    needs: [checks, image-smoke]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !github.event.repository.is_template }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Nombre de la imagen
+        id: image
+        # GHCR exige minúsculas y github.repository puede traer mayúsculas.
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: echo "name=ghcr.io/${REPOSITORY,,}/web" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          # <optional:analytics>
+          # La Measurement ID de GA4 no es secreta: variable de repo, horneada en build.
+          build-args: |
+            NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
+          # </optional:analytics>
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
+
+  deploy:
+    name: Redeploy en Coolify
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Redeploy en Coolify
+        env:
+          WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+          TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        # Un repo recién creado aún no tiene app en Coolify: se avisa y no se falla.
+        # Coolify 4 registra /api/v1/deploy como POST.
+        run: |
+          if [ -z "$WEBHOOK" ] || [ -z "$TOKEN" ]; then
+            echo "::warning::Sin COOLIFY_WEBHOOK_URL/COOLIFY_TOKEN: no se dispara el deploy. Corre /coolify-deploy."
+            exit 0
+          fi
+          curl --fail -X POST -H "Authorization: Bearer $TOKEN" "$WEBHOOK"

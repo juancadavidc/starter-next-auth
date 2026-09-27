@@ -212,6 +212,20 @@ describe("the real template", () => {
     const key = readLockKey(readFileSync(path.join(root, "packages/db/src/lock-key.ts"), "utf8"));
     expect(key).toBe(name === TEMPLATE_NAME ? TEMPLATE_LOCK_KEY : lockKeyFor(name));
   });
+
+  // El deploy vive en ci.yml detrás de los checks; quitar analytics solo quita el build-arg.
+  it("strips the GA build-arg from ci.yml and keeps publish gated on the checks", () => {
+    const root = path.resolve(import.meta.dirname, "..");
+    const ci = readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
+    expect(ci).toContain("NEXT_PUBLIC_GA_ID");
+    const stripped = removeMarkedBlocks(ci, "analytics");
+    expect(stripped).not.toContain("NEXT_PUBLIC_GA_ID");
+    expect(stripped).not.toContain("build-args");
+    expect(stripped).toContain("needs: [checks, image-smoke]");
+    // La imagen sale del repo, no de un nombre fijo que setup.ts tenga que acordarse de cambiar.
+    expect(stripped).not.toContain(`ghcr.io/juancadavidc/${TEMPLATE_NAME}`);
+    expect(existsSync(path.join(root, ".github/workflows/build-and-push.yml"))).toBe(false);
+  });
 });
 
 function fixture(): string {
