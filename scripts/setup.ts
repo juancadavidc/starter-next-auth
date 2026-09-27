@@ -23,6 +23,16 @@ export type Module = (typeof MODULES)[number];
 const KEEP_OPEN = "<keep:template>";
 const KEEP_CLOSE = "</keep:template>";
 
+// Un marcador solo cuenta si ocupa la línea entera como comentario (`//`, `#`, `{/* */}`
+// o `<!-- -->`). Así un README que menciona `<optional:storage>` en prosa no se come.
+function isMarkerLine(line: string, tag: string): boolean {
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+  return new RegExp(`^\\s*(?://|#|\\{/\\*|<!--)\\s*${escaped}\\s*(?:\\*/\\}|-->)?\\s*$`).test(line);
+}
+
+// Archivos que prueban que `root` es la plantilla (o un proyecto hecho con ella).
+const ROOT_SENTINELS = ["package.json", "packages/db/src/lock-key.ts"];
+
 const LOCK_KEY_FILE = "packages/db/src/lock-key.ts";
 
 const MODULE_LABELS: Record<Module, string> = {
@@ -125,11 +135,11 @@ export function replaceIdentity(content: string, name: string): string {
   return content
     .split("\n")
     .map((line) => {
-      if (line.includes(KEEP_OPEN)) keeping = true;
+      if (isMarkerLine(line, KEEP_OPEN)) keeping = true;
       const out = keeping
         ? line
         : replaceOnce(replaceOnce(line, TEMPLATE_NAME, name), TEMPLATE_SNAKE, toSnake(name));
-      if (line.includes(KEEP_CLOSE)) keeping = false;
+      if (isMarkerLine(line, KEEP_CLOSE)) keeping = false;
       return out;
     })
     .join("\n");
@@ -139,13 +149,13 @@ export function setLockKey(content: string, key: number): string {
   return content.replace(/MIGRATION_LOCK_KEY = [\d_]+;/, `MIGRATION_LOCK_KEY = ${key};`);
 }
 
-function readLockKey(content: string): number | null {
+export function readLockKey(content: string): number | null {
   const digits = /MIGRATION_LOCK_KEY = ([\d_]+);/.exec(content)?.[1];
   return digits ? Number(digits.replaceAll("_", "")) : null;
 }
 
 // Borra las líneas entre `<optional:x>` y `</optional:x>` (incluidas), sea cual sea el
-// estilo de comentario (//, #, {/* */}). Un bloque sin cierre es un error: truncar el
+// estilo de comentario (//, #, {/* */}, <!-- -->). Un bloque sin cierre es un error: truncar el
 // archivo en silencio sería peor.
 export function removeMarkedBlocks(content: string, module: Module): string {
   const open = `<optional:${module}>`;
@@ -154,10 +164,10 @@ export function removeMarkedBlocks(content: string, module: Module): string {
   let skipping = false;
   let justRemoved = false;
   for (const line of content.split("\n")) {
-    if (!skipping && line.includes(open)) {
+    if (!skipping && isMarkerLine(line, open)) {
       skipping = true;
     } else if (skipping) {
-      if (line.includes(close)) {
+      if (isMarkerLine(line, close)) {
         skipping = false;
         justRemoved = true;
       }
@@ -172,8 +182,35 @@ export function removeMarkedBlocks(content: string, module: Module): string {
   return kept.join("\n");
 }
 
+// Llena BETTER_AUTH_SECRET; si .env.example no trae la línea, la agrega al final.
 export function withSecret(envExample: string, secret: string): string {
-  return envExample.replace(/^BETTER_AUTH_SECRET=.*$/m, () => `BETTER_AUTH_SECRET=${secret}`);
+  const line = `BETTER_AUTH_SECRET=${secret}`;
+  if (!/^BETTER_AUTH_SECRET=/m.test(envExample)) {
+    const sep = envExample === "" || envExample.endsWith("\n") ? "" : "\n";
+    return `${envExample}${sep}${line}\n`;
+  }
+  return envExample.replace(/^BETTER_AUTH_SECRET=.*$/m, () => line);
+}
+
+// Un .env que ya existía no se toca, pero se avisa si parece a medio hacer.
+export function envWarnings(env: string): string[] {
+  const warnings: string[] = [];
+  if (env.includes(TEMPLATE_SNAKE) || env.includes(TEMPLATE_NAME)) {
+    warnings.push(`.env todavía menciona ${TEMPLATE_NAME}/${TEMPLATE_SNAKE} (p. ej. DATABASE_URL): revísalo.`);
+  }
+  if (!/^BETTER_AUTH_SECRET=\s*\S/m.test(env)) {
+    warnings.push(".env no tiene BETTER_AUTH_SECRET: genera uno con `openssl rand -base64 32`.");
+  }
+  return warnings;
+}
+
+// "https://app.ejemplo.com/" → "app.ejemplo.com"; vacío → undefined.
+export function normalizeDomain(domain: string | undefined): string | undefined {
+  const clean = domain
+    ?.trim()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
+    .replace(/\/+$/, "");
+  return clean || undefined;
 }
 
 const SKIP_DIRS = new Set([
@@ -200,7 +237,8 @@ export function listTextFiles(root: string): string[] {
   const walk = (rel: string) => {
     for (const entry of readdirSync(path.join(root, rel), { withFileTypes: true })) {
       const childRel = rel ? `${rel}/${entry.name}` : entry.name;
-      if (isUnder(childRel, SKIP_PATHS)) continue;
+      // Un symlink puede apuntar fuera del repo: nunca se sigue ni se reescribe.
+      if (entry.isSymbolicLink() || isUnder(childRel, SKIP_PATHS)) continue;
       if (entry.isDirectory()) {
         if (!SKIP_DIRS.has(entry.name)) walk(childRel);
       } else if (TEXT_FILE.test(childRel)) {
@@ -213,7 +251,14 @@ export function listTextFiles(root: string): string[] {
 }
 
 export type SetupOptions = { name: string; remove: Module[]; secret?: string };
-export type SetupResult = { changedFiles: string[]; envCreated: boolean; removed: Module[] };
+export type EnvStatus = "created" | "exists" | "no-example";
+export type SetupResult = {
+  changedFiles: string[];
+  envCreated: boolean;
+  env: EnvStatus;
+  envWarnings: string[];
+  removed: Module[];
+};
 
 // Aplica las ediciones de package.json de los módulos quitados. Si no cambia nada,
 // devuelve el texto original tal cual (sin reformatear).
@@ -229,6 +274,11 @@ export function runSetup(root: string, opts: SetupOptions): SetupResult {
   const error = validateName(opts.name);
   if (error) throw new Error(error);
   const abs = (rel: string) => path.join(root, rel);
+  // Correrlo desde otra carpeta reescribiría proyectos ajenos: se exige la raíz de la plantilla.
+  const missing = ROOT_SENTINELS.filter((rel) => !existsSync(abs(rel)));
+  if (missing.length) {
+    throw new Error(`${root} no parece la raíz de la plantilla (falta ${missing.join(", ")}). No se tocó nada.`);
+  }
   const isTemplate = opts.name === TEMPLATE_NAME;
   const removedPaths = opts.remove.flatMap((mod) => MODULE_SPECS[mod].paths);
 
@@ -264,19 +314,36 @@ export function runSetup(root: string, opts: SetupOptions): SetupResult {
   if (!isTemplate) rmSync(abs("docs/superpowers"), { recursive: true, force: true });
 
   // 5. .env: se crea una sola vez; nunca se pisa uno existente.
-  let envCreated = false;
-  if (!existsSync(abs(".env")) && existsSync(abs(".env.example"))) {
+  let env: EnvStatus;
+  let warnings: string[] = [];
+  if (existsSync(abs(".env"))) {
+    env = "exists";
+    warnings = envWarnings(readFileSync(abs(".env"), "utf8"));
+    if (isTemplate) warnings = warnings.filter((w) => !w.includes(TEMPLATE_SNAKE));
+  } else if (existsSync(abs(".env.example"))) {
     const secret = opts.secret ?? randomBytes(32).toString("base64");
     writeFileSync(abs(".env"), withSecret(readFileSync(abs(".env.example"), "utf8"), secret), { flag: "wx" });
-    envCreated = true;
+    env = "created";
+  } else {
+    env = "no-example";
   }
 
-  return { changedFiles: pending.map((p) => p.rel), envCreated, removed: opts.remove };
+  return {
+    changedFiles: pending.map((p) => p.rel),
+    envCreated: env === "created",
+    env,
+    envWarnings: warnings,
+    removed: opts.remove,
+  };
 }
+
+// La raíz es la carpeta padre de scripts/, no el cwd: `node x/scripts/setup.ts` desde
+// otra carpeta no debe tocar nada fuera del proyecto.
+const ROOT = path.resolve(import.meta.dirname, "..");
 
 function run(command: string, args: string[]): void {
   console.log(`\n$ ${command} ${args.join(" ")}`);
-  const result = spawnSync(command, args, { stdio: "inherit" });
+  const result = spawnSync(command, args, { stdio: "inherit", cwd: ROOT });
   if (result.status !== 0) {
     console.error(`✗ Falló: ${command} ${args.join(" ")}`);
     process.exit(result.status ?? 1);
@@ -325,8 +392,9 @@ async function main(): Promise<void> {
     console.log(validateName(name));
     name = (await rl.question("Nombre del proyecto (kebab-case): ")).trim();
   }
-  const domain =
-    values.domain ?? (rl ? (await rl.question("Dominio de producción (opcional): ")).trim() || undefined : undefined);
+  const domain = normalizeDomain(
+    values.domain ?? (rl ? await rl.question("Dominio de producción (opcional): ") : undefined),
+  );
 
   const skip: Record<Module, boolean> = {
     storage: values["no-storage"],
@@ -345,10 +413,16 @@ async function main(): Promise<void> {
   }
   rl?.close();
 
-  const result = runSetup(process.cwd(), { name, remove });
+  const result = runSetup(ROOT, { name, remove });
   console.log(`\n✓ ${result.changedFiles.length} archivo(s) actualizados.`);
   if (result.removed.length) console.log(`✓ Módulos quitados: ${result.removed.join(", ")}`);
-  console.log(result.envCreated ? "✓ .env creado con BETTER_AUTH_SECRET nuevo." : "• .env ya existía: no se tocó.");
+  const envMessages: Record<EnvStatus, string> = {
+    created: "✓ .env creado con BETTER_AUTH_SECRET nuevo.",
+    exists: "• .env ya existía: no se tocó.",
+    "no-example": "⚠ No hay .env.example: no se creó .env.",
+  };
+  console.log(envMessages[result.env]);
+  for (const warning of result.envWarnings) console.warn(`⚠ ${warning}`);
 
   run("pnpm", ["install"]);
   if (!values["no-db"]) {

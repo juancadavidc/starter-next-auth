@@ -1,14 +1,27 @@
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, existsSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  existsSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  envWarnings,
   lockKeyFor,
+  normalizeDomain,
+  readLockKey,
   removeMarkedBlocks,
   replaceIdentity,
   runSetup,
   setLockKey,
   TEMPLATE_LOCK_KEY,
+  TEMPLATE_NAME,
   validateName,
   withSecret,
 } from "./setup.ts";
@@ -52,6 +65,11 @@ describe("replaceIdentity", () => {
     const once = replaceIdentity(input, "my-starter-next-auth-v2");
     expect(once).toBe("name: my-starter-next-auth-v2\ndb: my_starter_next_auth_v2");
     expect(replaceIdentity(once, "my-starter-next-auth-v2")).toBe(once);
+  });
+
+  it("ignores <keep:template> mentioned in prose", () => {
+    const input = "Usa `<keep:template>` para proteger líneas.\n# starter-next-auth";
+    expect(replaceIdentity(input, "mi-idea")).toBe("Usa `<keep:template>` para proteger líneas.\n# mi-idea");
   });
 
   it("still renames when the new name is a substring of the template name", () => {
@@ -130,18 +148,69 @@ describe("removeMarkedBlocks", () => {
     expect(removeMarkedBlocks("x\ny", "pwa")).toBe("x\ny");
   });
 
+  it("removes <!-- --> blocks and ignores markers mentioned in prose", () => {
+    const md = [
+      "Los bloques `<optional:storage>` … `</optional:storage>` se quitan con el módulo.",
+      "<!-- <optional:storage> -->",
+      "Sección R2",
+      "<!-- </optional:storage> -->",
+      "fin",
+    ].join("\n");
+    expect(removeMarkedBlocks(md, "storage")).toBe(
+      ["Los bloques `<optional:storage>` … `</optional:storage>` se quitan con el módulo.", "fin"].join("\n"),
+    );
+    // Solo la mención en prosa, sin bloque: no hay error ni se borra nada.
+    const prose = 'const doc = "usa // <optional:pwa> para marcar";\nx';
+    expect(removeMarkedBlocks(prose, "pwa")).toBe(prose);
+  });
+
   it("refuses an unclosed block instead of truncating the file", () => {
     expect(() => removeMarkedBlocks("a\n// <optional:pwa>\nb\nc", "pwa")).toThrow(/optional:pwa/);
   });
 });
 
 describe("withSecret", () => {
+  it("appends the line when .env.example has none", () => {
+    expect(withSecret("A=1\n", "s")).toBe("A=1\nBETTER_AUTH_SECRET=s\n");
+    expect(withSecret("A=1", "s")).toBe("A=1\nBETTER_AUTH_SECRET=s\n");
+  });
+
   it("fills an empty BETTER_AUTH_SECRET line", () => {
     expect(withSecret("A=1\nBETTER_AUTH_SECRET=\nB=2", "s3cr3t")).toBe("A=1\nBETTER_AUTH_SECRET=s3cr3t\nB=2");
   });
 
   it("inserts the secret literally (no $-pattern expansion)", () => {
     expect(withSecret("BETTER_AUTH_SECRET=", "a$&b$1")).toBe("BETTER_AUTH_SECRET=a$&b$1");
+  });
+});
+
+describe("envWarnings", () => {
+  it("flags template names and an empty or missing secret", () => {
+    expect(envWarnings("DATABASE_URL=postgres://x/starter_next_auth\nBETTER_AUTH_SECRET=\n")).toHaveLength(2);
+    expect(envWarnings("A=1\n")).toEqual([expect.stringContaining("BETTER_AUTH_SECRET")]);
+    expect(envWarnings("DATABASE_URL=postgres://x/mi_idea\nBETTER_AUTH_SECRET=abc\n")).toEqual([]);
+  });
+});
+
+describe("normalizeDomain", () => {
+  it.each([
+    ["app.ejemplo.com", "app.ejemplo.com"],
+    [" https://app.ejemplo.com/ ", "app.ejemplo.com"],
+    ["http://app.ejemplo.com//", "app.ejemplo.com"],
+    ["", undefined],
+    [undefined, undefined],
+  ])("%j → %j", (input, expected) => {
+    expect(normalizeDomain(input)).toBe(expected);
+  });
+});
+
+describe("the real template", () => {
+  // En la plantilla la clave es TEMPLATE_LOCK_KEY; en un proyecto generado, la de su nombre.
+  it("pins packages/db/src/lock-key.ts to the key setup.ts expects", () => {
+    const root = path.resolve(import.meta.dirname, "..");
+    const name = (JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")) as { name: string }).name;
+    const key = readLockKey(readFileSync(path.join(root, "packages/db/src/lock-key.ts"), "utf8"));
+    expect(key).toBe(name === TEMPLATE_NAME ? TEMPLATE_LOCK_KEY : lockKeyFor(name));
   });
 });
 
@@ -248,6 +317,8 @@ describe("runSetup", () => {
     expect(read(root, ".env")).not.toContain("R2_BUCKET_NAME");
     expect(read(root, ".env")).toContain("NEXT_PUBLIC_GA_ID=");
     expect(result.envCreated).toBe(true);
+    expect(result.env).toBe("created");
+    expect(result.envWarnings).toEqual([]);
     expect(result.removed).toEqual(["storage", "pwa"]);
 
     expect(existsSync(path.join(root, "packages/storage"))).toBe(false);
@@ -345,6 +416,51 @@ describe("runSetup", () => {
     const before = snapshot(root);
     expect(() => runSetup(root, { name: "Mi Idea", remove: ["storage"] })).toThrow();
     expect(snapshot(root)).toEqual(before);
+  });
+
+  it("refuses a folder that is not the template root and touches nothing", () => {
+    const root = fixture();
+    rmSync(path.join(root, "packages/db/src/lock-key.ts"));
+    const before = snapshot(root);
+    expect(() => runSetup(root, { name: "mi-idea", remove: ["storage", "landing"], secret: "x" })).toThrow(
+      /lock-key\.ts/,
+    );
+    expect(snapshot(root)).toEqual(before);
+
+    const parent = mkdtempSync(path.join(tmpdir(), "setup-parent-"));
+    writeFileSync(path.join(parent, "notes.md"), "starter-next-auth");
+    expect(() => runSetup(parent, { name: "mi-idea", remove: [] })).toThrow(/package\.json/);
+    expect(snapshot(parent)).toEqual({ "notes.md": "starter-next-auth" });
+  });
+
+  it("never follows or rewrites symlinks", () => {
+    const root = fixture();
+    const outside = mkdtempSync(path.join(tmpdir(), "setup-outside-"));
+    writeFileSync(path.join(outside, "shared.md"), "starter-next-auth");
+    mkdirSync(path.join(outside, "dir"));
+    writeFileSync(path.join(outside, "dir/x.ts"), "starter-next-auth");
+    symlinkSync(path.join(outside, "shared.md"), path.join(root, "linked.md"));
+    symlinkSync(path.join(outside, "dir"), path.join(root, "linked-dir"));
+
+    const result = runSetup(root, { name: "mi-idea", remove: [], secret: "x" });
+    expect(readFileSync(path.join(outside, "shared.md"), "utf8")).toBe("starter-next-auth");
+    expect(readFileSync(path.join(outside, "dir/x.ts"), "utf8")).toBe("starter-next-auth");
+    expect(result.changedFiles).not.toContain("linked.md");
+  });
+
+  it("reports the .env status and warns about a half-done existing .env", () => {
+    const root = fixture();
+    writeFileSync(path.join(root, ".env"), "DATABASE_URL=postgres://x/starter_next_auth\nBETTER_AUTH_SECRET=\n");
+    const result = runSetup(root, { name: "mi-idea", remove: [] });
+    expect(result.env).toBe("exists");
+    expect(result.envWarnings).toHaveLength(2);
+    expect(read(root, ".env")).toBe("DATABASE_URL=postgres://x/starter_next_auth\nBETTER_AUTH_SECRET=\n");
+
+    const bare = fixture();
+    rmSync(path.join(bare, ".env.example"));
+    const none = runSetup(bare, { name: "mi-idea", remove: [] });
+    expect(none).toMatchObject({ env: "no-example", envCreated: false });
+    expect(existsSync(path.join(bare, ".env"))).toBe(false);
   });
 
   it("keeps the template docs and lock key when run on the template itself", () => {
