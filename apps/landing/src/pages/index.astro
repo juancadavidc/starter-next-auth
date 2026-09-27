@@ -1,0 +1,26 @@
+---
+import "../styles/global.css";
+
+const appUrl = import.meta.env.PUBLIC_APP_URL ?? "http://localhost:3000";
+---
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>starter-next-auth</title>
+    <meta name="description" content="Una idea nueva, con login de Google desde el primer día." />
+  </head>
+  <body class="min-h-dvh">
+    <main class="mx-auto flex min-h-dvh max-w-2xl flex-col items-center justify-center gap-6 px-4 text-center">
+      <h1 class="text-5xl font-semibold tracking-tight">starter-next-auth</h1>
+      <p class="text-lg text-muted-foreground">Una idea nueva, con login de Google desde el primer día.</p>
+      <a
+        href={`${appUrl}/login`}
+        class="rounded-lg bg-primary px-6 py-3 font-medium text-primary-foreground hover:opacity-90"
+      >
+        Entrar
+      </a>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "name": "landing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --port 4321",
+    "build": "astro build",
+    "typecheck": "astro check",
+    "deploy": "astro build && wrangler deploy"
+  },
+  "dependencies": {
+    "@repo/ui": "workspace:*",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.2.6",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.126.0"
+  }
+}
