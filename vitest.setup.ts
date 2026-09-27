@@ -11,7 +11,9 @@ process.env.BETTER_AUTH_URL ||= "http://localhost:3000";
 process.env.GOOGLE_CLIENT_ID ||= "test-google-client-id";
 process.env.GOOGLE_CLIENT_SECRET ||= "test-google-client-secret";
 
-// `server-only` lanza fuera de un bundle de servidor de Next; en tests no aplica.
+// `server-only` lanza fuera de un bundle de servidor de Next; en tests no aplica. Es
+// devDependency de la raíz para que este mock resuelva al mismo archivo que importan los
+// paquetes (si no, el id no coincide y el mock no aplica).
 vi.mock("server-only", () => ({}));
 
 // Fuera de un request de Next, `revalidateTag` lanza y `unstable_cache` no tiene almacén.

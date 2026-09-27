@@ -6,7 +6,8 @@
     ".": "./src/client.ts",
     "./schema": "./src/schema/index.ts",
     "./migrate": "./src/migrate.ts",
-    "./test-url": "./src/test-url.ts"
+    "./test-url": "./src/test-url.ts",
+    "./root-env": "./src/root-env.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
