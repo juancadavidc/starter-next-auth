@@ -16,5 +16,24 @@ services:
       timeout: 3s
       retries: 20
 
+  # Prueba local de la imagen de producción: `docker compose -f docker-compose.local.yaml
+  # --profile image up --build web`. No arranca con `pnpm db:up`.
+  web:
+    profiles: ["image"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgres://starter:starter@postgres:5432/starter_next_auth
+      BETTER_AUTH_SECRET: local-image-secret-local-image-secret
+      BETTER_AUTH_URL: http://localhost:3001
+      GOOGLE_CLIENT_ID: local-image
+      GOOGLE_CLIENT_SECRET: local-image
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:
