@@ -37,9 +37,8 @@ defaults, brand-lint). No se lleva nada del dominio de ninguno de los dos.
     `node:*`.
   - El service worker de la PWA se escribe en `apps/web/src/sw.ts` y se compila con
     esbuild a `public/sw.js` en el build (el `.js` generado no se versiona).
-  - Única excepción posible: la config de PostCSS que Tailwind v4 usa en Next. Si Next
-    no acepta `postcss.config.ts`, queda `postcss.config.mjs` documentado como
-    excepción en `AGENTS.md`.
+  - La config de PostCSS que Tailwind v4 usa en Next va en `postcss.config.json`
+    (formato que Next soporta), así que no queda ningún archivo JS a mano.
   - Lo que corre en la imagen de producción se compila (ver sección 6); en runtime
     solo hay JavaScript generado, nunca fuentes a mano.
 - Repo público `juancadavidc/starter-next-auth`, marcado como *template* en GitHub.
@@ -145,9 +144,11 @@ Tras el callback: si `profileCompleted` es falso → `/onboarding`; si no → `/
 - **Caché:** todo `unstable_cache` / `revalidateTag` en un solo módulo por app; las
   páginas que leen de la base son dinámicas, de modo que `next build` nunca necesita
   Postgres.
-- **Migraciones aditivas:** check en CI que falla si una migración nueva contiene
-  `DROP`, `RENAME` o `ALTER ... TYPE`, salvo que lleve el comentario
-  `-- allow-destructive: <motivo>`.
+- **Migraciones aditivas:** `scripts/check-migrations.ts` corre en CI y falla si
+  (a) un `.sql` de `packages/db/migrations/` ya existente se borra, modifica o
+  renombra (las aplicadas son historia; `meta/` sí puede cambiar porque drizzle-kit
+  la regenera), o (b) un `.sql` nuevo contiene `DROP`, `RENAME` o `ALTER ... TYPE`,
+  salvo que lleve el comentario `-- allow-destructive: <motivo>`.
 
 ### Variables de entorno (`packages/env`)
 
@@ -199,8 +200,11 @@ Tras el callback: si `profileCompleted` es falso → `/onboarding`; si no → `/
 - `ci.yml` (PR y push): install, lint, typecheck, brand-lint, check de migraciones
   aditivas, tests con Postgres como service.
 - `ci.yml` también construye la imagen y hace un **smoke test**: la levanta contra un
-  Postgres de servicio y verifica que migra y que `GET /api/health` responde 200
-  (el endpoint consulta `SELECT 1`). Protege el entrypoint empaquetado y el
+  Postgres de servicio y verifica que `GET /api/health` y `GET /api/health/db`
+  responden 200. `/api/health` es liveness y **no** toca la base (una caída de
+  Postgres no debe hacer que Coolify reinicie el contenedor en falso; lección de
+  benestare); `/api/health/db` consulta `SELECT 1` y la tabla `user` (prueba que
+  las migraciones corrieron). Protege el entrypoint empaquetado y el
   Dockerfile.
 - `build-and-push.yml` (push a `main`): build de la imagen, push a GHCR con tags
   `sha` y `latest` usando `GITHUB_TOKEN`, y `curl` al webhook de Coolify
