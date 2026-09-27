@@ -18,6 +18,12 @@ services:
       # Excepción documentada (Ruling #11): sin default vacío, Coolify fallaría el deploy
       # si no se define. Vacío es un valor legítimo: significa "nadie es admin todavía".
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      # <optional:storage>
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?falta R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?falta R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?falta R2_SECRET_ACCESS_KEY}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:?falta R2_BUCKET_NAME}
+      # </optional:storage>
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s

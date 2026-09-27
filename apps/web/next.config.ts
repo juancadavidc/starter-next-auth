@@ -14,7 +14,15 @@ const config: NextConfig = {
   // `next build` corre con cwd = apps/web (turbo/pnpm --filter).
   outputFileTracingRoot: path.resolve(process.cwd(), "../.."),
   // Los paquetes internos se publican como TypeScript fuente.
-  transpilePackages: ["@repo/auth", "@repo/db", "@repo/env", "@repo/ui"],
+  transpilePackages: [
+    "@repo/auth",
+    "@repo/db",
+    "@repo/env",
+    "@repo/ui",
+    // <optional:storage>
+    "@repo/storage",
+    // </optional:storage>
+  ],
 };
 
 export default config;
