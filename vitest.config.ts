@@ -10,6 +10,7 @@ export default defineConfig({
       "apps/web/src/**/*.test.{ts,tsx}",
       "scripts/**/*.test.ts",
     ],
+    globalSetup: ["./vitest.global-setup.ts"],
     setupFiles: ["./vitest.setup.ts"],
     // Los tests de integración comparten una base: se corren en serie.
     fileParallelism: false,
