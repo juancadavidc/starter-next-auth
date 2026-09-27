@@ -23,6 +23,20 @@ const config: NextConfig = {
     "@repo/storage",
     // </optional:storage>
   ],
+  // <optional:pwa>
+  // El service worker debe controlar todo el origen y no quedarse cacheado.
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+    ];
+  },
+  // </optional:pwa>
 };
 
 export default config;

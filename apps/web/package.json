@@ -3,10 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "build:sw": "esbuild src/sw.ts --bundle --format=iife --target=es2022 --minify --outfile=public/sw.js",
+    "dev": "pnpm build:sw && next dev",
+    "build": "pnpm build:sw && next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.sw.json --noEmit"
   },
   "dependencies": {
     "@repo/auth": "workspace:*",
@@ -26,6 +27,7 @@
     "@tailwindcss/postcss": "^4.3.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.28.0",
     "tailwindcss": "^4.3.3"
   }
 }

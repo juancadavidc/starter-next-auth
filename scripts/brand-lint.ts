@@ -21,6 +21,18 @@ export const EXCEPTIONS: Exception[] = [
     match: /themeColor/,
     reason: "Viewport.themeColor se emite como <meta> literal: no puede usar var(--token).",
   },
+  // <optional:pwa>
+  {
+    file: "apps/web/src/app/manifest.ts",
+    match: /(background_color|theme_color)/,
+    reason: "El manifest es JSON estático para el sistema operativo: no resuelve var(--token).",
+  },
+  {
+    file: "apps/web/src/app/icon.tsx",
+    match: /(background|color):/,
+    reason: "ImageResponse rasteriza fuera del navegador: no hay CSS de la app.",
+  },
+  // </optional:pwa>
 ];
 
 export function findViolations(

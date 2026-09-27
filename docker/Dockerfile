@@ -26,9 +26,11 @@ COPY --from=pruner /app/out/json/ .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 COPY --from=pruner /app/out/full/ .
 COPY docker ./docker
+# <optional:analytics>
 # NEXT_PUBLIC_* se hornea en el bundle: llega como build arg, no como env de Coolify.
 ARG NEXT_PUBLIC_GA_ID
 ENV NEXT_PUBLIC_GA_ID=$NEXT_PUBLIC_GA_ID
+# </optional:analytics>
 # El build no tiene secretos ni base de datos. BETTER_AUTH_SECRET es un placeholder solo
 # para esta línea de build (silencia el warning de "default secret" de Better Auth); nunca
 # se usa en runtime ni se fija como ENV de la imagen. `--env-mode=loose` es necesario para

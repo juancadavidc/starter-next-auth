@@ -26,9 +26,11 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
+          # <optional:analytics>
           # La Measurement ID de GA4 no es secreta: variable de repo, horneada en build.
           build-args: |
             NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
+          # </optional:analytics>
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |

@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Toaster } from "@repo/ui/components/sonner";
 import { ThemeProvider } from "@repo/ui/components/theme-provider";
+// <optional:analytics>
+import { Analytics } from "@/components/analytics";
+// </optional:analytics>
+// <optional:pwa>
+import { SwRegister } from "@/components/sw-register";
+// </optional:pwa>
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,6 +23,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {children}
           <Toaster />
         </ThemeProvider>
+        {/* <optional:analytics> */}
+        <Analytics />
+        {/* </optional:analytics> */}
+        {/* <optional:pwa> */}
+        <SwRegister />
+        {/* </optional:pwa> */}
       </body>
     </html>
   );

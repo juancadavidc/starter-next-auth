@@ -4,5 +4,10 @@
     "paths": { "@/*": ["./src/*"] }
   },
   "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    // <optional:pwa>
+    "src/sw.ts",
+    // </optional:pwa>
+  ]
 }
