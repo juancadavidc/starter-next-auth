@@ -23,7 +23,17 @@ defaults, brand-lint). No se lleva nada del dominio de ninguno de los dos.
 
 - **Código en inglés, comentarios en español.** Copy visible al usuario en español;
   sin i18n en el núcleo.
-- Node 22 LTS (`.nvmrc` + `engines`), pnpm fijado con `packageManager`.
+- Node 22 LTS (`.nvmrc` + `engines`, mínimo 22.18), pnpm fijado con `packageManager`.
+- **Todo es TypeScript.** No hay archivos `.js`/`.mjs` escritos a mano: scripts, configs
+  (`eslint.config.ts`, `next.config.ts`, `drizzle.config.ts`, `vitest.config.ts`,
+  `astro.config.ts`), entrypoint del contenedor y skill tooling van en `.ts`.
+  - Los scripts de desarrollo (`setup.ts`, `brand-lint.ts`, `check-migrations.ts`) se
+    ejecutan con el *type stripping* nativo de Node (`node scripts/setup.ts`), sin
+    dependencias. Por eso el `tsconfig` base activa `erasableSyntaxOnly` (sin `enum`,
+    `namespace` ni parameter properties) y los imports relativos llevan extensión `.ts`
+    (`allowImportingTsExtensions` + `rewriteRelativeImportExtensions`).
+  - Lo que corre en la imagen de producción se compila (ver sección 6); en runtime
+    solo hay JavaScript generado, nunca fuentes a mano.
 - Repo público `juancadavidc/starter-next-auth`, marcado como *template* en GitHub.
   Vive en `~/dev/personal/opensource/starter-next-auth`.
 
@@ -51,13 +61,13 @@ starter-next-auth/
     config/                tsconfig base, eslint, preset de vitest
   docker/
     Dockerfile
-    entrypoint.mjs
+    entrypoint.ts
   docker-compose.yaml        producción (Coolify)
   docker-compose.local.yaml  Postgres 17 local (+ servicio para probar la imagen)
   .github/workflows/
     ci.yml
     build-and-push.yml
-  scripts/setup.mjs
+  scripts/                 setup.ts, brand-lint.ts, check-migrations.ts
   tools/skill/             fuente de la skill /new-starter-next-auth
   .claude/settings.json    plugins habilitados: superpowers, ui-ux-pro-max
   AGENTS.md                reglas duras (CLAUDE.md → @AGENTS.md)
@@ -68,7 +78,7 @@ starter-next-auth/
 - **Paquetes internos como TypeScript fuente** (sin build propio); `apps/web` los
   consume con `transpilePackages`.
 - Opcionales (`storage`, `landing`, PWA, analytics) vienen incluidos y compilan
-  siempre; `setup.mjs` los elimina si el usuario no los quiere.
+  siempre; `setup.ts` los elimina si el usuario no los quiere.
 
 ## 3. Autenticación y usuarios
 
@@ -123,7 +133,7 @@ Tras el callback: si `profileCompleted` es falso → `/onboarding`; si no → `/
   `db:studio`, `db:seed:dev`, `db:dump`, `db:restore`.
 - `runMigrations(databaseUrl)`: toma `pg_advisory_lock(LOCK_KEY)`, aplica
   `migrate()`, libera en `finally`. `LOCK_KEY` es una constante derivada del nombre
-  del proyecto, fijada por `setup.mjs`.
+  del proyecto, fijada por `setup.ts`.
 - **Caché:** todo `unstable_cache` / `revalidateTag` en un solo módulo por app; las
   páginas que leen de la base son dinámicas, de modo que `next build` nunca necesita
   Postgres.
@@ -159,9 +169,12 @@ Tras el callback: si `profileCompleted` es falso → `/onboarding`; si no → `/
 - `docker/Dockerfile`: `turbo prune web --docker` → `pnpm install --frozen-lockfile`
   → `SKIP_ENV_VALIDATION=1 turbo build --filter=web` → runner `node:22-slim` con la
   salida standalone. `outputFileTracingRoot` apunta a la raíz del monorepo.
-- La imagen incluye las migraciones SQL y un `migrate.mjs` empaquetado desde
-  `packages/db` (una sola fuente; no se duplica la lógica).
-- `docker/entrypoint.mjs`: si el comando es el servidor y `SKIP_MIGRATIONS !== "1"`,
+- `docker/entrypoint.ts` importa `runMigrations()` de `packages/db` (una sola fuente;
+  no se duplica la lógica como en Baru). En la etapa de build se empaqueta con
+  `esbuild` a un único `entrypoint.js` (bundle con `postgres` y `drizzle-orm`
+  incluidos), así que el runner no necesita `node_modules` extra ni `tsx`. La imagen
+  copia además la carpeta de migraciones SQL.
+- `entrypoint.ts`: si el comando es el servidor y `SKIP_MIGRATIONS !== "1"`,
   corre las migraciones con lock; si fallan, `exit 1`. Luego lanza `server.js`
   reenviando `SIGTERM`/`SIGINT` y propagando el código de salida.
 
@@ -203,9 +216,10 @@ Tras el callback: si `profileCompleted` es falso → `/onboarding`; si no → `/
 
 ## 8. Setup y skill
 
-### `scripts/setup.mjs`
+### `scripts/setup.ts`
 
-Node puro, idempotente, `pnpm setup`. Modo interactivo o por flags
+TypeScript ejecutado por Node sin dependencias (funciona antes de `pnpm install`),
+idempotente, `pnpm setup`. Modo interactivo o por flags
 (`--name`, `--domain`, `--no-storage`, `--no-landing`, `--no-pwa`, `--no-analytics`,
 `--yes`).
 
@@ -245,4 +259,4 @@ Node puro, idempotente, `pnpm setup`. Modo interactivo o por flags
 6. Docker + entrypoint + compose; verificar la imagen en local.
 7. CI/CD.
 8. Opcionales: storage, PWA, analytics, landing.
-9. `setup.mjs` + skill + README/AGENTS.md; marcar el repo como template.
+9. `setup.ts` + skill + README/AGENTS.md; marcar el repo como template.
