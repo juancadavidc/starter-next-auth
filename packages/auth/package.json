@@ -1,0 +1,39 @@
+{
+  "name": "@repo/auth",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./roles": "./src/roles.ts",
+    "./api-error": "./src/api-error.ts",
+    "./safe-next": "./src/safe-next.ts",
+    "./access": "./src/access.ts",
+    "./dev-login": "./src/dev-login.ts",
+    "./server": "./src/server.ts",
+    "./session": "./src/session.ts",
+    "./guards": "./src/guards.ts",
+    "./client": "./src/client.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "db:seed:dev": "tsx src/cli/seed-dev.ts"
+  },
+  "dependencies": {
+    "@repo/db": "workspace:*",
+    "@repo/env": "workspace:*",
+    "better-auth": "^1.7.1",
+    "server-only": "^0.0.1"
+  },
+  "peerDependencies": {
+    "next": "^16.3.3",
+    "react": "^19.2.4"
+  },
+  "devDependencies": {
+    "@repo/config": "workspace:*",
+    "@types/react": "^19.2.14",
+    "dotenv": "^17.2.3",
+    "next": "^16.3.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tsx": "^4.21.0"
+  }
+}
