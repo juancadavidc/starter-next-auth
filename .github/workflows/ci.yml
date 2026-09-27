@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATABASE_URL: postgres://starter:starter@localhost:5432/starter_next_auth
+
+jobs:
+  checks:
+    name: Lint, tipos y tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: starter
+          POSTGRES_PASSWORD: starter
+          POSTGRES_DB: starter_next_auth
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U starter"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    steps:
+      # fetch-depth 0: el check de migraciones compara contra la rama base.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm brand-lint
+      - name: Migraciones solo aditivas
+        if: github.event_name == 'pull_request'
+        run: pnpm check-migrations origin/${{ github.base_ref }}
+      - run: pnpm test
+
+  image-smoke:
+    name: La imagen arranca y migra
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: starter
+          POSTGRES_PASSWORD: starter
+          POSTGRES_DB: starter_next_auth
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U starter"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          load: true
+          tags: app:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Arrancar la imagen
+        run: |
+          docker run -d --name app --network host \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e BETTER_AUTH_SECRET=ci-secret-ci-secret-ci-secret-0000 \
+            -e BETTER_AUTH_URL=http://localhost:3000 \
+            -e GOOGLE_CLIENT_ID=ci -e GOOGLE_CLIENT_SECRET=ci \
+            app:ci
+      - name: Health y base migrada
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS localhost:3000/api/health && curl -fsS localhost:3000/api/health/db; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs app
+          exit 1
