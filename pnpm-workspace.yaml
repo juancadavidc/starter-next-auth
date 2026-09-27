@@ -1,0 +1,17 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# pnpm 10 no corre scripts de instalación salvo que se permitan aquí.
+# esbuild y sharp los necesitan para bajar su binario nativo.
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+
+# Piden correr scripts de instalación pero no los necesitamos (traen su binario como
+# dependencia opcional por plataforma): se ignoran explícitamente para que pnpm no avise.
+ignoredBuiltDependencies:
+  - unrs-resolver
+  # <optional:landing>
+  - workerd
+  # </optional:landing>

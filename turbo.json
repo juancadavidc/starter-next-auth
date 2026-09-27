@@ -1,0 +1,33 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  // El .env de la raíz lo lee next.config.ts, no turbo: sin esto, cambiar una variable
+  // no invalida la caché de build. Si el archivo no existe (CI, Docker) no pasa nada.
+  "globalDependencies": [".env"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "env": ["SKIP_ENV_VALIDATION", "NEXT_PUBLIC_*"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "public/sw.js"]
+    },
+    "typecheck": { "dependsOn": ["^typecheck"] },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": [
+        "PORT",
+        // <optional:storage>
+        "R2_ACCOUNT_ID",
+        "R2_ACCESS_KEY_ID",
+        "R2_SECRET_ACCESS_KEY",
+        "R2_BUCKET_NAME",
+        // </optional:storage>
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "ADMIN_EMAILS"
+      ]
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "starter-next-auth",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "dev": "turbo run dev --filter=web",
+    "build": "turbo run build",
+    "lint": "eslint .",
+    "typecheck": "turbo run typecheck && pnpm exec tsc -p scripts --noEmit && pnpm exec tsc -p docker --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "brand-lint": "node scripts/brand-lint.ts",
+    "check-migrations": "node scripts/check-migrations.ts",
+    "bootstrap": "node scripts/setup.ts",
+    "db:up": "docker compose -f docker-compose.local.yaml up -d --wait",
+    "db:generate": "pnpm --filter @repo/db db:generate",
+    "db:migrate": "pnpm --filter @repo/db db:migrate",
+    "db:studio": "pnpm --filter @repo/db db:studio",
+    "db:seed:dev": "pnpm --filter @repo/auth db:seed:dev",
+    "db:dump": "pnpm --filter @repo/db db:dump",
+    "db:restore": "pnpm --filter @repo/db db:restore"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "dotenv": "^17.2.3",
+    "esbuild": "^0.28.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.4",
+    "jiti": "^2.4.0",
+    "next": "^16.3.6",
+    "server-only": "^0.0.1",
+    "tsx": "^4.21.0",
+    "turbo": "^2.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.2"
+  }
+}

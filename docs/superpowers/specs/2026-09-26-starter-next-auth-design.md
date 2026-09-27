@@ -72,8 +72,7 @@ starter-next-auth/
   docker-compose.yaml        producción (Coolify)
   docker-compose.local.yaml  Postgres 17 local (+ servicio para probar la imagen)
   .github/workflows/
-    ci.yml
-    build-and-push.yml
+    ci.yml                 checks → smoke → publish (GHCR) → deploy (Coolify)
   scripts/                 setup.ts, brand-lint.ts, check-migrations.ts
   tools/skill/             fuente de la skill /new-starter-next-auth
   .claude/settings.json    plugins habilitados: superpowers, ui-ux-pro-max
@@ -208,10 +207,13 @@ Tras el callback: si `profileCompleted` es falso → `/onboarding`; si no → `/
   benestare); `/api/health/db` consulta `SELECT 1` y la tabla `user` (prueba que
   las migraciones corrieron). Protege el entrypoint empaquetado y el
   Dockerfile.
-- `build-and-push.yml` (push a `main`): build de la imagen, push a GHCR con tags
-  `sha` y `latest` usando `GITHUB_TOKEN`, y `curl` al webhook de Coolify
+- Jobs `publish` y `deploy` de `ci.yml` (solo en push a `main`, con
+  `needs: [checks, image-smoke]` y nunca en el repo de la plantilla): build de la
+  imagen, push a `ghcr.io/<owner>/<repo>/web` (en minúsculas) con tags `sha` y
+  `latest` usando `GITHUB_TOKEN`, y `curl` al webhook de Coolify
   (`COOLIFY_WEBHOOK_URL`, `COOLIFY_TOKEN` como secrets). Si faltan los secrets, el
-  paso se salta con aviso en vez de fallar.
+  paso se salta con aviso en vez de fallar. (Antes era un `build-and-push.yml`
+  aparte; se unió a `ci.yml` para que un push con tests rotos no despliegue.)
 - Compatible con el plugin `coolify-devops`: la plantilla ya trae el workflow, así que
   `/coolify-deploy` solo crea la app "Docker Image" y configura el webhook.
 

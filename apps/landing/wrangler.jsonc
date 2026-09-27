@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "starter-next-auth-landing",
+  "compatibility_date": "2026-09-01",
+  // Sitio estático puro: Cloudflare sirve dist/ tal cual. Este archivo evita que
+  // `wrangler deploy` suba por el árbol buscando otra configuración.
+  "assets": { "directory": "./dist" }
+}
