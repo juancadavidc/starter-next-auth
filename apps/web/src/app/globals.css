@@ -1,0 +1,5 @@
+@import "tailwindcss";
+@import "@repo/ui/styles.css";
+
+/* Tailwind debe escanear las clases usadas en los componentes compartidos. */
+@source "../../../../packages/ui/src";
