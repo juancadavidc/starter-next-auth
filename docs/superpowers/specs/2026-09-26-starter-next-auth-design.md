@@ -134,10 +134,12 @@ Tras el callback: si `profileCompleted` es falso → `/onboarding`; si no → `/
 
 - `postgres.js` + Drizzle, conexión por `DATABASE_URL`.
 - Schema en `packages/db/src/schema/`: `auth.ts` (user, session, account,
-  verification — generado con el CLI de Better Auth y versionado) y `app.ts`
+  verification — escrito siguiendo el schema que genera el CLI de Better Auth, más
+  `profileCompleted`) y `app.ts`
   (vacío, con un ejemplo comentado).
 - Scripts del paquete: `db:generate` (drizzle-kit), `db:migrate` (`runMigrations()`),
-  `db:studio`, `db:seed:dev`, `db:dump`, `db:restore`.
+  `db:studio`, `db:dump`, `db:restore`. `db:seed:dev` vive en `packages/auth` (usa Better
+  Auth para crear las cuentas); desde la raíz todos se llaman igual (`pnpm db:*`).
 - `runMigrations(databaseUrl)`: toma `pg_advisory_lock(LOCK_KEY)`, aplica
   `migrate()`, libera en `finally`. `LOCK_KEY` es una constante derivada del nombre
   del proyecto, fijada por `setup.ts`.
@@ -235,7 +237,8 @@ Tras el callback: si `profileCompleted` es falso → `/onboarding`; si no → `/
 ### `scripts/setup.ts`
 
 TypeScript ejecutado por Node sin dependencias (funciona antes de `pnpm install`),
-idempotente, `pnpm setup`. Modo interactivo o por flags
+idempotente, `pnpm bootstrap` (`pnpm setup` es un comando interno de pnpm y no sirve
+como nombre de script). Modo interactivo o por flags
 (`--name`, `--domain`, `--no-storage`, `--no-landing`, `--no-pwa`, `--no-analytics`,
 `--yes`).
 
@@ -259,7 +262,8 @@ idempotente, `pnpm setup`. Modo interactivo o por flags
   1. Pregunta nombre, qué se quiere construir (una línea) y opcionales.
   2. `gh repo create juancadavidc/<nombre> --template juancadavidc/starter-next-auth
      --public --clone` en `~/dev/personal/opensource/<nombre>`.
-  3. `pnpm install && pnpm setup --name <nombre> [--no-...] --yes`.
+  3. `node scripts/setup.ts --name <nombre> [--no-...] --yes` (el script corre `pnpm install`,
+     levanta Postgres, migra y siembra).
   4. Verifica `pnpm typecheck && pnpm test`.
   5. Ofrece continuar con el brainstorming de superpowers sobre la idea y, cuando
      toque, `/coolify-deploy`.
