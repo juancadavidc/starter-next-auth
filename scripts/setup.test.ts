@@ -117,6 +117,15 @@ describe("removeMarkedBlocks", () => {
     expect(removeMarkedBlocks(jsx.join("\n"), "analytics")).toBe(["      <body>", "      </body>"].join("\n"));
   });
 
+  it("does not leave a double blank line where a block was", () => {
+    const env = ["A=", "", "# <optional:storage>", "R2=", "# </optional:storage>", "", "# <optional:analytics>", "GA=", "# </optional:analytics>", ""];
+    const out = (["storage", "analytics"] as const).reduce((text, mod) => removeMarkedBlocks(text, mod), env.join("\n"));
+    expect(out).toBe("A=\n");
+    expect(removeMarkedBlocks(["A=", "", "# <optional:storage>", "R2=", "# </optional:storage>", "", "B="].join("\n"), "storage")).toBe(
+      "A=\n\nB=",
+    );
+  });
+
   it("leaves content without markers untouched", () => {
     expect(removeMarkedBlocks("x\ny", "pwa")).toBe("x\ny");
   });

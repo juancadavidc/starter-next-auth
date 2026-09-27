@@ -152,13 +152,20 @@ export function removeMarkedBlocks(content: string, module: Module): string {
   const close = `</optional:${module}>`;
   const kept: string[] = [];
   let skipping = false;
+  let justRemoved = false;
   for (const line of content.split("\n")) {
     if (!skipping && line.includes(open)) {
       skipping = true;
     } else if (skipping) {
-      if (line.includes(close)) skipping = false;
+      if (line.includes(close)) {
+        skipping = false;
+        justRemoved = true;
+      }
     } else {
-      kept.push(line);
+      // Un bloque que estaba entre dos líneas en blanco no deja un hueco doble.
+      const blankAfterBlank = justRemoved && line.trim() === "" && (kept.at(-1) ?? "").trim() === "";
+      if (!blankAfterBlank) kept.push(line);
+      justRemoved = false;
     }
   }
   if (skipping) throw new Error(`Marcador ${open} sin su cierre ${close}.`);
