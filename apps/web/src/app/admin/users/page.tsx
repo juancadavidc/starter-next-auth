@@ -48,21 +48,24 @@ export default async function AdminUsersPage() {
                 <TableCell>{u.email}</TableCell>
                 <TableCell>{u.role}</TableCell>
                 <TableCell>{u.banned ? "Suspendido" : "Activo"}</TableCell>
-                <TableCell className="flex justify-end gap-2">
-                  <RowActionForm action={changeRole}>
-                    <input type="hidden" name="userId" value={u.id} />
-                    <input type="hidden" name="role" value={u.role === "admin" ? "user" : "admin"} />
-                    <Button size="sm" variant="outline" disabled={self}>
-                      {u.role === "admin" ? "Quitar admin" : "Hacer admin"}
-                    </Button>
-                  </RowActionForm>
-                  <RowActionForm action={changeBan}>
-                    <input type="hidden" name="userId" value={u.id} />
-                    <input type="hidden" name="banned" value={u.banned ? "false" : "true"} />
-                    <Button size="sm" variant={u.banned ? "outline" : "destructive"} disabled={self}>
-                      {u.banned ? "Reactivar" : "Suspender"}
-                    </Button>
-                  </RowActionForm>
+                <TableCell>
+                  {/* display:flex va en un div: sobre el <td> rompe el layout de la tabla. */}
+                  <div className="flex justify-end gap-2">
+                    <RowActionForm action={changeRole}>
+                      <input type="hidden" name="userId" value={u.id} />
+                      <input type="hidden" name="role" value={u.role === "admin" ? "user" : "admin"} />
+                      <Button size="sm" variant="outline" disabled={self}>
+                        {u.role === "admin" ? "Quitar admin" : "Hacer admin"}
+                      </Button>
+                    </RowActionForm>
+                    <RowActionForm action={changeBan}>
+                      <input type="hidden" name="userId" value={u.id} />
+                      <input type="hidden" name="banned" value={u.banned ? "false" : "true"} />
+                      <Button size="sm" variant={u.banned ? "outline" : "destructive"} disabled={self}>
+                        {u.banned ? "Reactivar" : "Suspender"}
+                      </Button>
+                    </RowActionForm>
+                  </div>
                 </TableCell>
               </TableRow>
             );
