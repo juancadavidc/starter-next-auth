@@ -12,8 +12,21 @@ GitHub Actions → GHCR → Coolify.
 - Onboarding mínimo (nombre) con guard: nadie entra a `/app` sin perfil completo.
 - Migraciones Drizzle que se aplican al arrancar el contenedor, con advisory lock.
 - shadcn/ui con tokens claro/oscuro; `brand-lint` prohíbe colores crudos.
-- CI: lint, tipos, tests, migraciones solo aditivas y smoke test de la imagen.
-- Opcionales: storage R2, landing Astro, PWA, Google Analytics.
+- CI: lint, tipos, tests, migraciones solo aditivas y smoke test de la imagen; solo si
+  todo pasa, publica la imagen en GHCR y redepliega en Coolify.
+<!-- <optional:storage> -->
+- Opcional: subida de imágenes a Cloudflare R2 con variantes webp.
+<!-- </optional:storage> -->
+<!-- <optional:landing> -->
+- Opcional: landing estática en Astro para Cloudflare.
+<!-- </optional:landing> -->
+<!-- <optional:pwa> -->
+- Opcional: PWA instalable con página sin conexión.
+<!-- </optional:pwa> -->
+<!-- <optional:analytics> -->
+- Opcional: Google Analytics 4 (`NEXT_PUBLIC_GA_ID`; en CI, variable de repo del mismo
+  nombre).
+<!-- </optional:analytics> -->
 
 ## Crear una idea nueva
 
@@ -68,18 +81,24 @@ obligatorios (sin ellos el server no arranca).
 | Carpeta | Qué hay |
 |---|---|
 | `apps/web` | La app Next (App Router, `proxy.ts`, server actions) |
-| `apps/landing` | Landing estática en Astro (opcional) |
 | `packages/env` | Variables de entorno fail-fast |
 | `packages/db` | Schema, migraciones, cliente y `runMigrations()` |
 | `packages/auth` | Better Auth, roles, guards, login de dev |
 | `packages/ui` | shadcn/ui y tokens de marca |
-| `packages/storage` | R2 + variantes webp (opcional) |
 | `docker/` | Dockerfile y entrypoint (migrar → servir) |
 | `scripts/` | `setup.ts`, `brand-lint.ts`, `check-migrations.ts` |
+<!-- <optional:storage> -->
 
-La landing (opcional) apunta a la app con la variable `PUBLIC_APP_URL` (Astro/Vite);
-sin ella cae a `http://localhost:3000`. En Cloudflare Pages/Wrangler, defínela como
-variable de build apuntando al dominio de producción de la app.
+`packages/storage` (opcional): cliente de R2 y variantes webp; la app sirve los archivos
+en `/api/files/<key>`. Variables `R2_*` en `.env`.
+<!-- </optional:storage> -->
+<!-- <optional:landing> -->
+
+`apps/landing` (opcional): landing estática en Astro. Apunta a la app con la variable
+`PUBLIC_APP_URL` (Astro/Vite); sin ella cae a `http://localhost:3000`. En Cloudflare
+Pages/Wrangler, defínela como variable de build apuntando al dominio de producción de la
+app.
+<!-- </optional:landing> -->
 
 ## Base de datos
 
@@ -96,7 +115,13 @@ variable de build apuntando al dominio de producción de la app.
 
 ## Build de producción en local
 
-`pnpm build` genera un standalone (`output: "standalone"` en `next.config.ts`); no uses
+```bash
+SKIP_ENV_VALIDATION=1 pnpm build
+```
+
+Genera un standalone (`output: "standalone"` en `next.config.ts`). Sin
+`SKIP_ENV_VALIDATION=1` el build exige `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (en
+producción son obligatorios); con ellos en `.env`, basta `pnpm build`. No uses
 `next start` para probarlo, avisa que no sirve con ese modo. Dos formas de correr el
 resultado real:
 
@@ -113,9 +138,10 @@ resultado real:
 
 ## Desplegar
 
-1. Push a `main` → GitHub Actions publica `ghcr.io/juancadavidc/<repo>/web`. El paquete
-   de GHCR nace **privado**: hazlo público en GitHub → Packages → Settings, o dale
-   credenciales de GHCR a Coolify.
+1. Push a `main` → `ci.yml` corre los checks y el smoke test; solo si pasan, el job
+   `publish` sube `ghcr.io/<owner>/<repo>/web` (en minúsculas) y `deploy` redepliega. El
+   repo de la plantilla no publica nada. El paquete de GHCR nace **privado**: hazlo
+   público en GitHub → Packages → Settings, o dale credenciales de GHCR a Coolify.
 2. `/coolify-deploy` crea la app "Docker Image" en Coolify con las variables de
    `docker-compose.yaml`.
 3. `gh secret set COOLIFY_WEBHOOK_URL` y `gh secret set COOLIFY_TOKEN`: desde ahí cada
@@ -123,3 +149,16 @@ resultado real:
 
 El contenedor aplica las migraciones al arrancar; si fallan, no arranca.
 `SKIP_MIGRATIONS=1` permite entrar a mirar sin tocar la base.
+
+## Recuperar acceso de admin
+
+`ADMIN_EMAILS` solo se aplica al **crear** la cuenta: agregar un correo después no
+vuelve admin a un usuario que ya existe. Si la app se quedó sin admins (o necesitas
+promover a alguien existente), cambia el rol directo en la base, con `pnpm db:studio`
+o con `psql "$DATABASE_URL"`:
+
+```sql
+UPDATE "user" SET role = 'admin' WHERE lower(email) = lower('tu-correo@gmail.com');
+```
+
+El cambio aplica en la siguiente petición (la sesión no se cachea en cookie).

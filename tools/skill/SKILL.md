@@ -67,8 +67,11 @@ git add -A && git commit -m "chore: proyecto creado desde starter-next-auth" && 
   `http://localhost:3000` y `https://<dominio>`; redirects
   `<origen>/api/auth/callback/google`).
 - Poner su correo en `ADMIN_EMAILS` **antes** de crear su cuenta (solo aplica al alta;
-  si ya existe, cambiar el rol desde `/admin/users` o directo en la base).
+  si ya existe, cambiar el rol desde `/admin/users` o directo en la base; ver
+  "Recuperar acceso de admin" en el README).
 - Ofrecer arrancar el brainstorming de superpowers sobre la idea.
 - Cuando quiera desplegar: `/coolify-deploy` y luego `gh secret set COOLIFY_WEBHOOK_URL` /
-  `gh secret set COOLIFY_TOKEN`. El paquete de GHCR nace privado: hacerlo público en
-  GitHub → Packages → Settings o darle credenciales de GHCR a Coolify.
+  `gh secret set COOLIFY_TOKEN`. La imagen la publica `ci.yml` (jobs `publish` y
+  `deploy`) en cada push a `main`, solo si pasan los checks y el smoke test. El paquete
+  de GHCR nace privado: hacerlo público en GitHub → Packages → Settings o darle
+  credenciales de GHCR a Coolify.
