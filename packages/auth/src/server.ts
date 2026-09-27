@@ -23,10 +23,34 @@ function socialProviders() {
   return {};
 }
 
+// Endpoints HTTP del plugin admin (/api/auth/admin/*). La app no los usa: roles y baneos
+// pasan por apps/web/src/lib/admin-users.ts, que aplica la regla "un admin no se toca a sí
+// mismo". Expuestos, un admin podría saltársela (set-role, ban-user, impersonate-user,
+// create-user, set-user-password…). Se apagan todos; auth.api.* en el servidor sigue
+// funcionando porque disabledPaths solo filtra peticiones HTTP.
+export const DISABLED_ADMIN_PATHS = [
+  "/admin/set-role",
+  "/admin/get-user",
+  "/admin/create-user",
+  "/admin/update-user",
+  "/admin/list-users",
+  "/admin/list-user-sessions",
+  "/admin/unban-user",
+  "/admin/ban-user",
+  "/admin/impersonate-user",
+  "/admin/stop-impersonating",
+  "/admin/revoke-user-session",
+  "/admin/revoke-user-sessions",
+  "/admin/remove-user",
+  "/admin/set-user-password",
+  "/admin/has-permission",
+];
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg", schema }),
   baseURL: env.betterAuthUrl,
   secret: env.betterAuthSecret,
+  disabledPaths: DISABLED_ADMIN_PATHS,
   emailAndPassword: { enabled: isDevLoginEnabled(env.nodeEnv) },
   socialProviders: socialProviders(),
   session: {

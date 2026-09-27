@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { db, eq, schema } from "@repo/db";
-import { auth } from "./server";
+import { auth, DISABLED_ADMIN_PATHS } from "./server";
 
 const password = "a-long-test-password";
 
@@ -60,5 +60,37 @@ describe("auth user creation", () => {
     const row = await userByEmail("sneaky@example.test");
     expect(row?.role).toBe("user");
     expect(row?.profileCompleted).toBe(false);
+  });
+});
+
+describe("admin plugin HTTP endpoints", () => {
+  const url = (p: string) => `http://localhost:3000/api/auth${p}`;
+
+  it("disables every /admin/* endpoint the plugin registers", () => {
+    // Si una versión nueva del plugin agrega endpoints, este test obliga a revisarlos.
+    const adminPaths = Object.values(auth.api)
+      .map((endpoint) => (endpoint as { path?: string }).path)
+      .filter((p): p is string => typeof p === "string" && p.startsWith("/admin/"));
+    expect(adminPaths.length).toBeGreaterThan(0);
+    expect([...DISABLED_ADMIN_PATHS].sort()).toEqual([...new Set(adminPaths)].sort());
+  });
+
+  it.each(["/admin/set-role", "/admin/impersonate-user", "/admin/create-user", "/admin/set-user-password"])(
+    "answers 404 to POST %s",
+    async (p) => {
+      const res = await auth.handler(
+        new Request(url(p), {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+          body: "{}",
+        }),
+      );
+      expect(res.status).toBe(404);
+    },
+  );
+
+  it("keeps the rest of the auth API reachable", async () => {
+    const res = await auth.handler(new Request(url("/get-session")));
+    expect(res.status).toBe(200);
   });
 });
