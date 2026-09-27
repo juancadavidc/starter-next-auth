@@ -23,15 +23,23 @@ defaults, brand-lint). No se lleva nada del dominio de ninguno de los dos.
 
 - **Código en inglés, comentarios en español.** Copy visible al usuario en español;
   sin i18n en el núcleo.
-- Node 22 LTS (`.nvmrc` + `engines`, mínimo 22.18), pnpm fijado con `packageManager`.
+- Node 24 LTS (`.nvmrc` + `engines`), pnpm fijado con `packageManager`.
 - **Todo es TypeScript.** No hay archivos `.js`/`.mjs` escritos a mano: scripts, configs
   (`eslint.config.ts`, `next.config.ts`, `drizzle.config.ts`, `vitest.config.ts`,
   `astro.config.ts`), entrypoint del contenedor y skill tooling van en `.ts`.
   - Los scripts de desarrollo (`setup.ts`, `brand-lint.ts`, `check-migrations.ts`) se
     ejecutan con el *type stripping* nativo de Node (`node scripts/setup.ts`), sin
-    dependencias. Por eso el `tsconfig` base activa `erasableSyntaxOnly` (sin `enum`,
-    `namespace` ni parameter properties) y los imports relativos llevan extensión `.ts`
-    (`allowImportingTsExtensions` + `rewriteRelativeImportExtensions`).
+    dependencias. Solo `scripts/` tiene un `tsconfig` propio con `erasableSyntaxOnly`
+    (sin `enum`, `namespace` ni parameter properties) e imports relativos con extensión
+    `.ts`; el resto del monorepo no lleva esas restricciones (Next, Vitest y esbuild
+    compilan por su cuenta).
+  - `setup.ts` corre antes de `pnpm install`: es autocontenido y solo importa módulos
+    `node:*`.
+  - El service worker de la PWA se escribe en `apps/web/src/sw.ts` y se compila con
+    esbuild a `public/sw.js` en el build (el `.js` generado no se versiona).
+  - Única excepción posible: la config de PostCSS que Tailwind v4 usa en Next. Si Next
+    no acepta `postcss.config.ts`, queda `postcss.config.mjs` documentado como
+    excepción en `AGENTS.md`.
   - Lo que corre en la imagen de producción se compila (ver sección 6); en runtime
     solo hay JavaScript generado, nunca fuentes a mano.
 - Repo público `juancadavidc/starter-next-auth`, marcado como *template* en GitHub.
@@ -167,7 +175,7 @@ Tras el callback: si `profileCompleted` es falso → `/onboarding`; si no → `/
 ### Imagen
 
 - `docker/Dockerfile`: `turbo prune web --docker` → `pnpm install --frozen-lockfile`
-  → `SKIP_ENV_VALIDATION=1 turbo build --filter=web` → runner `node:22-slim` con la
+  → `SKIP_ENV_VALIDATION=1 turbo build --filter=web` → runner `node:24-slim` con la
   salida standalone. `outputFileTracingRoot` apunta a la raíz del monorepo.
 - `docker/entrypoint.ts` importa `runMigrations()` de `packages/db` (una sola fuente;
   no se duplica la lógica como en Baru). En la etapa de build se empaqueta con
@@ -190,6 +198,10 @@ Tras el callback: si `profileCompleted` es falso → `/onboarding`; si no → `/
 
 - `ci.yml` (PR y push): install, lint, typecheck, brand-lint, check de migraciones
   aditivas, tests con Postgres como service.
+- `ci.yml` también construye la imagen y hace un **smoke test**: la levanta contra un
+  Postgres de servicio y verifica que migra y que `GET /api/health` responde 200
+  (el endpoint consulta `SELECT 1`). Protege el entrypoint empaquetado y el
+  Dockerfile.
 - `build-and-push.yml` (push a `main`): build de la imagen, push a GHCR con tags
   `sha` y `latest` usando `GITHUB_TOKEN`, y `curl` al webhook de Coolify
   (`COOLIFY_WEBHOOK_URL`, `COOLIFY_TOKEN` como secrets). Si faltan los secrets, el
