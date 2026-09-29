@@ -363,8 +363,9 @@ function printNextSteps(name: string, domain: string | undefined): void {
 
 2. ADMIN_EMAILS en .env: tu correo de Google, para nacer admin.
 
-3. Desplegar: /coolify-deploy crea la app "Docker Image" en Coolify; luego
-   gh secret set COOLIFY_WEBHOOK_URL  y  gh secret set COOLIFY_TOKEN
+3. Desplegar: /coolify-deploy crea las apps de staging y producción en Coolify; luego
+   gh secret set COOLIFY_TOKEN,  gh secret set COOLIFY_WEBHOOK_URL (staging)  y
+   gh secret set COOLIFY_PROD_WEBHOOK_URL --env production (ver "Desplegar" en el README)
 
 4. pnpm dev → http://localhost:3000
 `);

@@ -12,8 +12,10 @@ GitHub Actions → GHCR → Coolify.
 - Onboarding mínimo (nombre) con guard: nadie entra a `/app` sin perfil completo.
 - Migraciones Drizzle que se aplican al arrancar el contenedor, con advisory lock.
 - shadcn/ui con tokens claro/oscuro; `brand-lint` prohíbe colores crudos.
-- CI: lint, tipos, tests, migraciones solo aditivas y smoke test de la imagen; solo si
-  todo pasa, publica la imagen en GHCR y redepliega en Coolify.
+- CI con los workflows comunes de
+  [`shared-gha-stackless`](https://github.com/juancadavidc/shared-gha-stackless): lint,
+  tipos, tests, migraciones solo aditivas y smoke test de la imagen. Cada merge a `main`
+  despliega **staging**; un pre-release `vX.Y.Z-rc.N` promueve a **producción**.
 <!-- <optional:storage> -->
 - Opcional: subida de imágenes a Cloudflare R2 con variantes webp.
 <!-- </optional:storage> -->
@@ -138,14 +140,39 @@ resultado real:
 
 ## Desplegar
 
-1. Push a `main` → `ci.yml` corre los checks y el smoke test; solo si pasan, el job
-   `publish` sube `ghcr.io/<owner>/<repo>/web` (en minúsculas) y `deploy` redepliega. El
-   repo de la plantilla no publica nada. El paquete de GHCR nace **privado**: hazlo
-   público en GitHub → Packages → Settings, o dale credenciales de GHCR a Coolify.
-2. `/coolify-deploy` crea la app "Docker Image" en Coolify con las variables de
-   `docker-compose.yaml`.
-3. `gh secret set COOLIFY_WEBHOOK_URL` y `gh secret set COOLIFY_TOKEN`: desde ahí cada
-   merge redepliega solo (sin esos secrets, el job `deploy` solo avisa y no falla).
+Los workflows son llamadas cortas a
+[`juancadavidc/shared-gha-stackless`](https://github.com/juancadavidc/shared-gha-stackless)
+(`@v1`); la lógica vive allá.
+
+| Workflow | Cuándo | Qué hace |
+|----------|--------|----------|
+| `ci.yml` | cada PR | checks + smoke test de la imagen |
+| `staging.yml` | merge a `main` | checks + smoke → `ghcr.io/<owner>/<repo>/web:staging` y `:<sha>` → redeploy de **staging** |
+| `release.yml` | pre-release `vX.Y.Z-rc.N` | checks + smoke sobre ese commit → `:vX.Y.Z` y `:latest` → release final `vX.Y.Z` → redeploy de **producción**, espera y health check |
+
+`latest` es solo de producción y solo lo mueve un release. El repo de la plantilla no
+publica ni despliega nada.
+
+1. El primer merge a `main` publica la imagen. El paquete de GHCR nace **privado**:
+   hazlo público en GitHub → Packages → Settings, o dale credenciales de GHCR a Coolify.
+2. `/coolify-deploy` crea **dos** apps "Docker Image" en Coolify con las variables de
+   `docker-compose.yaml`: staging con `TAG=staging` y producción con `TAG=latest`
+   (cada una con su base de datos).
+3. Secrets y variables:
+   ```bash
+   gh secret set COOLIFY_TOKEN
+   gh secret set COOLIFY_WEBHOOK_URL                            # webhook de staging
+   gh secret set COOLIFY_PROD_WEBHOOK_URL --env production      # webhook de producción
+   gh variable set STAGING_URL --body https://staging.<dominio>
+   gh variable set PRODUCTION_URL --body https://<dominio>      # habilita el health check
+   ```
+   Sin los de staging, `staging.yml` publica la imagen y solo avisa. En producción, un
+   secret faltante hace fallar el release. En Settings → Environments → `production`
+   puedes exigir aprobación manual antes de cada deploy.
+4. Release a producción:
+   ```bash
+   gh release create v1.0.0-rc.1 --prerelease --target main --generate-notes
+   ```
 
 El contenedor aplica las migraciones al arrancar; si fallan, no arranca.
 `SKIP_MIGRATIONS=1` permite entrar a mirar sin tocar la base.

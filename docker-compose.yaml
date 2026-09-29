@@ -5,7 +5,8 @@
 # placeholders.
 services:
   web:
-    # Debe coincidir con lo que publica ci.yml: ghcr.io/<owner>/<repo>/web en minúsculas.
+    # Debe coincidir con lo que publica CI: ghcr.io/<owner>/<repo>/web en minúsculas.
+    # TAG=staging en la app de staging; producción usa `latest` (lo mueve release.yml).
     # setup.ts renombra el proyecto aquí; si el repo vive en otro owner, ajústalo.
     image: ghcr.io/juancadavidc/starter-next-auth/web:${TAG:-latest}
     restart: unless-stopped
