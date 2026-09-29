@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
-# Imagen de la app. La construye GitHub Actions (job `publish` de .github/workflows/ci.yml,
-# solo si pasaron los checks) y la publica en GHCR; Coolify solo hace pull.
+# Imagen de la app. La construye GitHub Actions (staging.yml y release.yml, con los flujos de
+# shared-gha-stackless, solo si pasaron los checks) y la publica en GHCR; Coolify solo hace pull.
 # Se construye desde la raíz del monorepo:
 #   docker build -f docker/Dockerfile -t app .
 #

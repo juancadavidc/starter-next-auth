@@ -1,0 +1,41 @@
+name: Staging
+
+# Merge a main → mismos checks y smoke que ci.yml → imagen ghcr.io/<owner>/<repo>/web con
+# tags `staging` y `<sha>` → redeploy de la app de staging en Coolify. `latest` es solo de
+# producción: lo mueve release.yml. Ver juancadavidc/shared-gha-stackless.
+
+on:
+  push:
+    branches: [main]
+
+# Un merge nuevo reemplaza al anterior: solo se publica y despliega el último.
+concurrency:
+  group: staging
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  staging:
+    # El repo de la plantilla nunca publica ni despliega.
+    if: ${{ !github.event.repository.is_template }}
+    permissions:
+      contents: read
+      packages: write
+    uses: juancadavidc/shared-gha-stackless/.github/workflows/staging.yml@v1
+    with:
+      skip-scripts: build
+      dockerfile: docker/Dockerfile
+      smoke-health-paths: /api/health /api/health/db
+      smoke-env: |
+        BETTER_AUTH_SECRET=ci-secret-ci-secret-ci-secret-0000
+        BETTER_AUTH_URL=http://localhost:3000
+        GOOGLE_CLIENT_ID=ci
+        GOOGLE_CLIENT_SECRET=ci
+      # <optional:analytics>
+      # La Measurement ID de GA4 no es secreta: variable de repo, horneada en build.
+      build-args: NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
+      # </optional:analytics>
+      staging-url: ${{ vars.STAGING_URL }}
+    secrets: inherit

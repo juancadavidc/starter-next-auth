@@ -70,8 +70,11 @@ git add -A && git commit -m "chore: proyecto creado desde starter-next-auth" && 
   si ya existe, cambiar el rol desde `/admin/users` o directo en la base; ver
   "Recuperar acceso de admin" en el README).
 - Ofrecer arrancar el brainstorming de superpowers sobre la idea.
-- Cuando quiera desplegar: `/coolify-deploy` y luego `gh secret set COOLIFY_WEBHOOK_URL` /
-  `gh secret set COOLIFY_TOKEN`. La imagen la publica `ci.yml` (jobs `publish` y
-  `deploy`) en cada push a `main`, solo si pasan los checks y el smoke test. El paquete
-  de GHCR nace privado: hacerlo público en GitHub → Packages → Settings o darle
+- Cuando quiera desplegar: `/coolify-deploy` (crea las apps de staging, `TAG=staging`, y
+  producción, `TAG=latest`) y luego `gh secret set COOLIFY_TOKEN`,
+  `gh secret set COOLIFY_WEBHOOK_URL` (staging) y
+  `gh secret set COOLIFY_PROD_WEBHOOK_URL --env production`. Los workflows llaman a
+  `juancadavidc/shared-gha-stackless@v1`: cada merge a `main` publica `:staging` y
+  despliega staging; un pre-release `vX.Y.Z-rc.N` promueve a producción (`:latest`). El
+  paquete de GHCR nace privado: hacerlo público en GitHub → Packages → Settings o darle
   credenciales de GHCR a Coolify.

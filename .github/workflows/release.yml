@@ -1,0 +1,50 @@
+name: Release a producción
+
+# Se publica en GitHub un PRE-RELEASE con tag vX.Y.Z-rc.N (o se lanza a mano con ese tag)
+# → checks y smoke sobre ese commit → imagen :vX.Y.Z + :latest → release final vX.Y.Z →
+# redeploy de la app de producción en Coolify → espera → health check. El webhook de
+# producción es secret del environment `production`. Ver juancadavidc/shared-gha-stackless.
+#
+# Ojo: GitHub corre este workflow tal como está en el commit del tag del RC.
+
+on:
+  release:
+    types: [prereleased]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag del pre-release a promover (p. ej. v1.0.0-rc.1)
+        required: true
+
+# Un release a la vez; nunca se cancela uno a medio desplegar.
+concurrency:
+  group: release-produccion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    # El repo de la plantilla nunca publica ni despliega.
+    if: ${{ !github.event.repository.is_template }}
+    permissions:
+      contents: write
+      packages: write
+    uses: juancadavidc/shared-gha-stackless/.github/workflows/release.yml@v1
+    with:
+      tag: ${{ github.event.release.tag_name || inputs.tag }}
+      skip-scripts: build
+      dockerfile: docker/Dockerfile
+      smoke-health-paths: /api/health /api/health/db
+      smoke-env: |
+        BETTER_AUTH_SECRET=ci-secret-ci-secret-ci-secret-0000
+        BETTER_AUTH_URL=http://localhost:3000
+        GOOGLE_CLIENT_ID=ci
+        GOOGLE_CLIENT_SECRET=ci
+      # <optional:analytics>
+      # La Measurement ID de GA4 no es secreta: variable de repo, horneada en build.
+      build-args: NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
+      # </optional:analytics>
+      production-url: ${{ vars.PRODUCTION_URL }}
+    secrets: inherit

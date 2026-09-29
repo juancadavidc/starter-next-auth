@@ -34,8 +34,8 @@ monorepo pnpm/Turborepo. Ver `README.md` para arrancar.
 - Variables nuevas: getter en `packages/env/src/index.ts` + `.env.example` +
   `docker-compose.yaml` + `passThroughEnv` de la tarea `dev` en `turbo.json` (sin eso,
   una variable exportada en el shell no llega a `pnpm dev`). Si es `NEXT_PUBLIC_*`, se
-  hornea en build: va como build-arg en `docker/Dockerfile` y en el job `publish` de
-  `ci.yml`.
+  hornea en build: va como build-arg en `docker/Dockerfile` y en `build-args` de
+  `staging.yml` y `release.yml`.
 <!-- <optional:storage> -->
 - Las variables de un módulo van en su paquete: las `R2_*` de storage tienen su getter en
   `packages/storage/src/env.ts` y siguen el mismo camino (`.env.example`,
@@ -49,8 +49,10 @@ monorepo pnpm/Turborepo. Ver `README.md` para arrancar.
 
 ## Despliegue
 
-GitHub Actions → GHCR → Coolify (`/coolify-deploy`, `/coolify-debug`). Todo vive en
-`.github/workflows/ci.yml`: `publish` (GHCR) y `deploy` (webhook de Coolify) dependen de
-`checks` e `image-smoke` y solo corren en push a `main`; no agregues un workflow de
-publicación aparte que se salte los checks. Coolify no construye imágenes. Las
+GitHub Actions → GHCR → Coolify (`/coolify-deploy`, `/coolify-debug`). Los workflows
+llaman a los comunes de `juancadavidc/shared-gha-stackless@v1`: `ci.yml` (PR: checks y
+smoke), `staging.yml` (merge a `main` → `:staging` → Coolify staging) y `release.yml`
+(pre-release `vX.Y.Z-rc.N` → `:vX.Y.Z` + `:latest` → Coolify producción). Esos flujos solo
+publican si pasan los checks y el smoke; no agregues un workflow de publicación aparte que
+se los salte. Si hace falta algo que el repo común no cubre, cámbialo allá. Coolify no construye imágenes. Las
 migraciones corren en `docker/entrypoint.ts` al arrancar.

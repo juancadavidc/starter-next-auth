@@ -1,176 +1,36 @@
 name: CI
 
+# Verificación de cada PR con los workflows comunes de juancadavidc/shared-gha-stackless:
+# lint, tipos, brand-lint, migraciones solo aditivas, migrate y tests contra un Postgres
+# efímero, más el smoke de la imagen. Publicar y desplegar vive en staging.yml y release.yml.
+
 on:
   pull_request:
-    branches: [main]
-  push:
-    branches: [main]
 
-# En PR se cancela la corrida vieja; en main se encolan, para no cortar un push a GHCR
-# o un deploy a medias.
+# Un push nuevo al mismo PR deja obsoleta la validación anterior.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
-# Mínimo por defecto; solo el job `publish` pide escribir paquetes.
 permissions:
   contents: read
-
-env:
-  DATABASE_URL: postgres://starter:starter@localhost:5432/starter_next_auth
 
 jobs:
   checks:
     name: Lint, tipos y tests
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: starter
-          POSTGRES_PASSWORD: starter
-          POSTGRES_DB: starter_next_auth
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U starter"
-          --health-interval 2s --health-timeout 3s --health-retries 20
-    steps:
-      # fetch-depth 0: el check de migraciones compara contra la rama base.
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm brand-lint
-      - name: Migraciones solo aditivas
-        # En PR se compara contra la rama base; en push a main, contra el commit previo
-        # del ref (github.event.before). Los valores de GitHub llegan por env, nunca
-        # interpolados directo en el script.
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
-          BEFORE_SHA: ${{ github.event.before }}
-        run: |
-          zero="0000000000000000000000000000000000000000"
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            base="origin/$BASE_REF"
-          elif [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "$zero" ]; then
-            echo "::warning::Sin commit 'before' válido (primer push del ref): se omite el check de migraciones."
-            exit 0
-          elif ! git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
-            echo "::warning::El commit 'before' ($BEFORE_SHA) no está en el historial (force-push): se omite el check de migraciones."
-            exit 0
-          else
-            base="$BEFORE_SHA"
-          fi
-          pnpm check-migrations "$base"
-      - run: pnpm test
+    uses: juancadavidc/shared-gha-stackless/.github/workflows/node-ci.yml@v1
+    with:
+      # El build de Next ya lo cubre image-smoke.
+      skip-scripts: build
 
   image-smoke:
     name: La imagen arranca y migra
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: starter
-          POSTGRES_PASSWORD: starter
-          POSTGRES_DB: starter_next_auth
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U starter"
-          --health-interval 2s --health-timeout 3s --health-retries 20
-    steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile
-          load: true
-          tags: app:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Arrancar la imagen
-        run: |
-          docker run -d --name app --network host \
-            -e DATABASE_URL="$DATABASE_URL" \
-            -e BETTER_AUTH_SECRET=ci-secret-ci-secret-ci-secret-0000 \
-            -e BETTER_AUTH_URL=http://localhost:3000 \
-            -e GOOGLE_CLIENT_ID=ci -e GOOGLE_CLIENT_SECRET=ci \
-            app:ci
-      - name: Health y base migrada
-        run: |
-          for _ in $(seq 1 30); do
-            if curl -fsS localhost:3000/api/health && curl -fsS localhost:3000/api/health/db; then
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs app
-          exit 1
-
-  # Publicar y desplegar solo si todo lo anterior pasó, solo en push a main y nunca desde
-  # el repo de la plantilla (sus pushes no deben publicar una imagen ni desplegar).
-  publish:
-    name: Publicar imagen en GHCR
-    needs: [checks, image-smoke]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !github.event.repository.is_template }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Nombre de la imagen
-        id: image
-        # GHCR exige minúsculas y github.repository puede traer mayúsculas.
-        env:
-          REPOSITORY: ${{ github.repository }}
-        run: echo "name=ghcr.io/${REPOSITORY,,}/web" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile
-          push: true
-          # <optional:analytics>
-          # La Measurement ID de GA4 no es secreta: variable de repo, horneada en build.
-          build-args: |
-            NEXT_PUBLIC_GA_ID=${{ vars.NEXT_PUBLIC_GA_ID }}
-          # </optional:analytics>
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: |
-            ${{ steps.image.outputs.name }}:latest
-            ${{ steps.image.outputs.name }}:${{ github.sha }}
-
-  deploy:
-    name: Redeploy en Coolify
-    needs: publish
-    runs-on: ubuntu-latest
-    permissions: {}
-    steps:
-      - name: Redeploy en Coolify
-        env:
-          WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_URL }}
-          TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-        # Un repo recién creado aún no tiene app en Coolify: se avisa y no se falla.
-        # Coolify 4 registra /api/v1/deploy como POST.
-        run: |
-          if [ -z "$WEBHOOK" ] || [ -z "$TOKEN" ]; then
-            echo "::warning::Sin COOLIFY_WEBHOOK_URL/COOLIFY_TOKEN: no se dispara el deploy. Corre /coolify-deploy."
-            exit 0
-          fi
-          curl --fail -X POST -H "Authorization: Bearer $TOKEN" "$WEBHOOK"
+    uses: juancadavidc/shared-gha-stackless/.github/workflows/image-smoke.yml@v1
+    with:
+      dockerfile: docker/Dockerfile
+      health-paths: /api/health /api/health/db
+      env: |
+        BETTER_AUTH_SECRET=ci-secret-ci-secret-ci-secret-0000
+        BETTER_AUTH_URL=http://localhost:3000
+        GOOGLE_CLIENT_ID=ci
+        GOOGLE_CLIENT_SECRET=ci

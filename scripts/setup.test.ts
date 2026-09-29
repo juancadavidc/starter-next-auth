@@ -213,17 +213,28 @@ describe("the real template", () => {
     expect(key).toBe(name === TEMPLATE_NAME ? TEMPLATE_LOCK_KEY : lockKeyFor(name));
   });
 
-  // El deploy vive en ci.yml detrás de los checks; quitar analytics solo quita el build-arg.
-  // En un proyecto generado sin analytics el bloque ya no está: se prueba igual el resto.
-  it("strips the GA build-arg from ci.yml and keeps publish gated on the checks", () => {
+  // Publicar y desplegar vive en staging.yml y release.yml, que llaman a los flujos comunes de
+  // shared-gha-stackless (esos ya publican solo si pasan checks y smoke). Quitar analytics solo
+  // quita el build-arg. En un proyecto generado sin analytics el bloque ya no está: se prueba
+  // igual el resto.
+  it.each(["staging", "release"])("strips the GA build-arg from %s.yml and keeps the shared gated flow", (flow) => {
     const root = path.resolve(import.meta.dirname, "..");
-    const ci = readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
-    const stripped = removeMarkedBlocks(ci, "analytics");
+    const workflow = readFileSync(path.join(root, `.github/workflows/${flow}.yml`), "utf8");
+    const stripped = removeMarkedBlocks(workflow, "analytics");
     expect(stripped).not.toContain("NEXT_PUBLIC_GA_ID");
     expect(stripped).not.toContain("build-args");
-    expect(stripped).toContain("needs: [checks, image-smoke]");
+    expect(stripped).toContain(`uses: juancadavidc/shared-gha-stackless/.github/workflows/${flow}.yml@v1`);
+    // La plantilla nunca publica ni despliega.
+    expect(stripped).toContain("if: ${{ !github.event.repository.is_template }}");
     // La imagen sale del repo, no de un nombre fijo que setup.ts tenga que acordarse de cambiar.
     expect(stripped).not.toContain(`ghcr.io/juancadavidc/${TEMPLATE_NAME}`);
+  });
+
+  it("only verifies in ci.yml and has no publish workflow outside the shared flows", () => {
+    const root = path.resolve(import.meta.dirname, "..");
+    const ci = readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
+    expect(ci).toContain("uses: juancadavidc/shared-gha-stackless/.github/workflows/node-ci.yml@v1");
+    expect(ci).not.toContain("packages: write");
     expect(existsSync(path.join(root, ".github/workflows/build-and-push.yml"))).toBe(false);
   });
 });
