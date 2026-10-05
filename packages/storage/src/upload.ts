@@ -1,7 +1,7 @@
 import { ApiError } from "@repo/auth/api-error";
 import { makeImageVariants, type VariantSize } from "./image-variants";
 import { newObjectKey } from "./keys";
-import { deleteObjects, putObject } from "./r2";
+import { deleteObjects, putObject } from "./objects";
 
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
