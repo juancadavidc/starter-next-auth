@@ -91,8 +91,11 @@ obligatorios (sin ellos el server no arranca).
 | `scripts/` | `setup.ts`, `brand-lint.ts`, `check-migrations.ts` |
 <!-- <optional:storage> -->
 
-`packages/storage` (opcional): cliente de R2 y variantes webp; la app sirve los archivos
-en `/api/files/<key>`. Variables `R2_*` en `.env`.
+`packages/storage` (opcional): almacén de objetos y variantes webp; la app sirve los
+archivos en `/api/files/<key>`. En producción usa Cloudflare R2 (variables `R2_*`,
+obligatorias). En desarrollo y tests, si no hay `R2_ACCOUNT_ID`, guarda en un directorio
+local (`.storage`, o `STORAGE_LOCAL_DIR`), así que no hace falta una cuenta de Cloudflare
+para arrancar; con las `R2_*` en `.env`, `pnpm dev` usa el bucket.
 <!-- </optional:storage> -->
 <!-- <optional:landing> -->
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSafeKey, newObjectKey, safeExtension } from "./keys";
+import { contentTypeForKey, isSafeKey, newObjectKey, safeExtension } from "./keys";
 
 describe("safeExtension", () => {
   it.each([
@@ -24,7 +24,18 @@ describe("isSafeKey", () => {
     expect(isSafeKey(key)).toBe(true);
   });
 
-  it.each(["../etc/passwd", "/abs", "a//b", "a/../b", "", "a b"])("rejects %s", (key) => {
+  it.each(["../etc/passwd", "/abs", "a//b", "a/../b", "a/./b", "", "a b"])("rejects %s", (key) => {
     expect(isSafeKey(key)).toBe(false);
+  });
+});
+
+describe("contentTypeForKey", () => {
+  it.each([
+    ["a/b-sm.webp", "image/webp"],
+    ["a/b.JPG", "image/jpeg"],
+    ["a/b.avif", "image/avif"],
+    ["a/sin-extension", "application/octet-stream"],
+  ])("%s → %s", (key, type) => {
+    expect(contentTypeForKey(key)).toBe(type);
   });
 });

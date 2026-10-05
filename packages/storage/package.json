@@ -6,7 +6,7 @@
     "./keys": "./src/keys.ts",
     "./image-variants": "./src/image-variants.ts",
     "./upload": "./src/upload.ts",
-    "./r2": "./src/r2.ts"
+    "./objects": "./src/objects.ts"
   },
   "scripts": { "typecheck": "tsc --noEmit" },
   "dependencies": {

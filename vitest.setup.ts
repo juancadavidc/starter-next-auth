@@ -10,6 +10,11 @@ process.env.BETTER_AUTH_SECRET ||= "test-secret-test-secret-test-secret-00";
 process.env.BETTER_AUTH_URL ||= "http://localhost:3000";
 process.env.GOOGLE_CLIENT_ID ||= "test-google-client-id";
 process.env.GOOGLE_CLIENT_SECRET ||= "test-google-client-secret";
+// <optional:storage>
+// Los tests nunca tocan el bucket real aunque el .env tenga credenciales: sin
+// R2_ACCOUNT_ID, @repo/storage usa su almacén local.
+delete process.env.R2_ACCOUNT_ID;
+// </optional:storage>
 
 // `server-only` lanza fuera de un bundle de servidor de Next; en tests no aplica. Es
 // devDependency de la raíz para que este mock resuelva al mismo archivo que importan los

@@ -14,6 +14,9 @@ db-dumps/
 .DS_Store
 apps/web/AGENTS.md
 apps/web/CLAUDE.md
+# <optional:storage>
+.storage/
+# </optional:storage>
 # <optional:landing>
 apps/landing/.astro/
 # </optional:landing>

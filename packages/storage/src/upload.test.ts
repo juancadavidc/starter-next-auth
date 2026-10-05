@@ -1,10 +1,10 @@
 import sharp from "sharp";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@repo/auth/api-error";
-import * as r2 from "./r2";
+import * as objects from "./objects";
 import { assertImageFile, assertUploadRequestSize, MAX_IMAGE_BYTES, uploadImage } from "./upload";
 
-vi.mock("./r2", () => ({
+vi.mock("./objects", () => ({
   putObject: vi.fn(),
   deleteObjects: vi.fn(),
 }));
@@ -65,39 +65,39 @@ async function pngFile(name = "a.png"): Promise<File> {
 
 describe("uploadImage", () => {
   it("uploads the three variants and returns their keys", async () => {
-    vi.mocked(r2.putObject).mockResolvedValue(undefined);
+    vi.mocked(objects.putObject).mockResolvedValue(undefined);
     const result = await uploadImage(await pngFile(), "Avatars");
 
-    expect(r2.putObject).toHaveBeenCalledTimes(3);
+    expect(objects.putObject).toHaveBeenCalledTimes(3);
     expect(Object.keys(result.keys)).toEqual(["sm", "md", "lg"]);
     for (const size of ["sm", "md", "lg"] as const) {
       expect(result.keys[size]).toMatch(new RegExp(`^avatars/[0-9a-f-]{36}-${size}\\.webp$`));
-      expect(r2.putObject).toHaveBeenCalledWith(result.keys[size], expect.any(Buffer), "image/webp");
+      expect(objects.putObject).toHaveBeenCalledWith(result.keys[size], expect.any(Buffer), "image/webp");
     }
-    expect(r2.deleteObjects).not.toHaveBeenCalled();
+    expect(objects.deleteObjects).not.toHaveBeenCalled();
   });
 
   it("cleans up the uploaded variants and rethrows when one putObject fails", async () => {
-    vi.mocked(r2.putObject)
+    vi.mocked(objects.putObject)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error("network"));
-    vi.mocked(r2.deleteObjects).mockResolvedValue(undefined);
+    vi.mocked(objects.deleteObjects).mockResolvedValue(undefined);
 
     await expect(uploadImage(await pngFile(), "avatars")).rejects.toThrow("No se pudo guardar la imagen");
 
-    expect(r2.deleteObjects).toHaveBeenCalledTimes(1);
-    const [deletedKeys] = vi.mocked(r2.deleteObjects).mock.calls[0] as [string[]];
+    expect(objects.deleteObjects).toHaveBeenCalledTimes(1);
+    const [deletedKeys] = vi.mocked(objects.deleteObjects).mock.calls[0] as [string[]];
     expect(deletedKeys).toHaveLength(3);
   });
 
   it("logs the cleanup failure but still surfaces the original error", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.mocked(r2.putObject)
+    vi.mocked(objects.putObject)
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error("network"))
       .mockResolvedValueOnce(undefined);
-    vi.mocked(r2.deleteObjects).mockRejectedValue(new Error("delete failed"));
+    vi.mocked(objects.deleteObjects).mockRejectedValue(new Error("delete failed"));
 
     await expect(uploadImage(await pngFile(), "avatars")).rejects.toThrow("No se pudo guardar la imagen");
 

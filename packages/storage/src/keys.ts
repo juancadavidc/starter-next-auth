@@ -20,5 +20,20 @@ export function newObjectKey(prefix: string, filename: string): string {
 // pública /api/files/<key>.
 export function isSafeKey(key: string): boolean {
   if (!key) return false;
-  return key.split("/").every((segment) => /^[A-Za-z0-9._-]+$/.test(segment) && segment !== "..");
+  return key.split("/").every((segment) => /^[A-Za-z0-9._-]+$/.test(segment) && segment !== "." && segment !== "..");
+}
+
+const CONTENT_TYPES: Record<string, string> = {
+  avif: "image/avif",
+  webp: "image/webp",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+};
+
+// Para el almacén local, que no guarda el Content-Type de cada objeto.
+export function contentTypeForKey(key: string): string {
+  const ext = /\.([a-z0-9]+)$/i.exec(key)?.[1]?.toLowerCase() ?? "";
+  return CONTENT_TYPES[ext] ?? "application/octet-stream";
 }

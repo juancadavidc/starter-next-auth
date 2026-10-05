@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// R2 no existe en los tests: se sustituye getObject por un doble.
+// Doble de getObject: estos tests cubren las cabeceras y el filtro de keys, no el almacén.
 const getObject = vi.fn();
-vi.mock("@repo/storage/r2", () => ({ getObject: (key: string) => getObject(key) }));
+vi.mock("@repo/storage/objects", () => ({ getObject: (key: string) => getObject(key) }));
 
 const { GET } = await import("./route");
 
@@ -17,6 +17,7 @@ describe("GET /api/files/[...key]", () => {
     getObject.mockResolvedValueOnce({
       body: new Blob(["<svg><script>alert(1)</script></svg>"]).stream(),
       contentType: "image/svg+xml",
+      contentLength: 36,
     });
     const res = await call(["uploads", "a.svg"]);
     expect(res.status).toBe(200);
@@ -24,9 +25,10 @@ describe("GET /api/files/[...key]", () => {
     expect(res.headers.get("content-type")).toBe("image/svg+xml");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(res.headers.get("content-security-policy")).toBe("sandbox");
+    expect(res.headers.get("content-length")).toBe("36");
   });
 
-  it("answers 404 for unsafe keys without reaching R2", async () => {
+  it("answers 404 for unsafe keys without reaching the store", async () => {
     const res = await call(["..", "secret"]);
     expect(res.status).toBe(404);
     expect(getObject).not.toHaveBeenCalled();

@@ -40,6 +40,10 @@ monorepo pnpm/Turborepo. Ver `README.md` para arrancar.
 - Las variables de un módulo van en su paquete: las `R2_*` de storage tienen su getter en
   `packages/storage/src/env.ts` y siguen el mismo camino (`.env.example`,
   `docker-compose.yaml`, `turbo.json`).
+- Archivos: siempre por `@repo/storage/objects` (`putObject`, `getObject`,
+  `deleteObjects`, `listObjects`) o `@repo/storage/upload`, nunca con el SDK de S3 directo.
+  Usa R2 si hay `R2_ACCOUNT_ID` y siempre en producción; en desarrollo y tests, sin
+  credenciales, un directorio local (`STORAGE_LOCAL_DIR`, por defecto `.storage`).
 <!-- </optional:storage> -->
 
 ## Comandos
