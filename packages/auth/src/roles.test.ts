@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isRole, parseAdminEmails, roleForEmail } from "./roles";
+import { isRoleKey, parseAdminEmails, roleForEmail } from "./roles";
 
 describe("parseAdminEmails", () => {
   it("normalizes case, spaces and empty entries", () => {
@@ -30,11 +30,13 @@ describe("roleForEmail", () => {
   });
 });
 
-describe("isRole", () => {
-  it("accepts only known roles", () => {
-    expect(isRole("admin")).toBe(true);
-    expect(isRole("user")).toBe(true);
-    expect(isRole("root")).toBe(false);
-    expect(isRole(undefined)).toBe(false);
+describe("isRoleKey", () => {
+  it("accepts lowercase slugs that start with a letter", () => {
+    expect(isRoleKey("admin")).toBe(true);
+    expect(isRoleKey("soporte-n2")).toBe(true);
+  });
+
+  it.each(["", "a", "Soporte", "2fa", "con espacio", "x".repeat(33), undefined])("rejects %j", (value) => {
+    expect(isRoleKey(value)).toBe(false);
   });
 });

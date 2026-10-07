@@ -62,7 +62,7 @@ export function LoginButtons({ next, googleEnabled, devLogin }: Props) {
           <p className="text-xs text-muted-foreground">Solo desarrollo</p>
           {DEV_USERS.map((u) => (
             <Button key={u.email} variant="outline" onClick={() => asDevUser(u.email)} disabled={pending}>
-              Entrar como {u.role}
+              Entrar como {u.label}
             </Button>
           ))}
         </div>

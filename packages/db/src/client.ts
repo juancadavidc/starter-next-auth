@@ -12,4 +12,4 @@ if (env.nodeEnv !== "production") globalForDb.pgClient = client;
 export const db = drizzle(client, { schema });
 export type Db = typeof db;
 export { schema };
-export { and, asc, desc, eq, or, sql } from "drizzle-orm";
+export { and, asc, count, desc, eq, or, sql } from "drizzle-orm";

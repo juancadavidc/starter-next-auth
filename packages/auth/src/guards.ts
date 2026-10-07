@@ -2,6 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { decideAccess, type Requirement, type SessionUser } from "./access";
 import { ApiError } from "./api-error";
+import type { Permission } from "./permissions";
 import { getSessionUser } from "./session";
 
 // Guards de página: cada page.tsx protegida llama al suyo. Los layouts no protegen nada.
@@ -15,7 +16,9 @@ async function requirePage(requirement: Requirement, currentPath?: string): Prom
 export const requireUser = (currentPath?: string) => requirePage("user", currentPath);
 export const requireCompletedProfile = (currentPath?: string) =>
   requirePage("completed-profile", currentPath);
-export const requireAdmin = (currentPath?: string) => requirePage("admin", currentPath);
+// Exige perfil completo y el permiso (sale del rol del usuario; admin los tiene todos).
+export const requirePermission = (permission: Permission, currentPath?: string) =>
+  requirePage({ permission }, currentPath);
 
 // Guard de route handlers y server actions: lanza ApiError(401|403).
 export async function requireApi(requirement: Requirement): Promise<SessionUser> {
@@ -27,7 +30,7 @@ export async function requireApi(requirement: Requirement): Promise<SessionUser>
   return user!;
 }
 
-// Mismos requisitos que requireUser/requireAdmin: requireUserApi no exige perfil completo
-// (lo usa la server action del onboarding); requireAdminApi sí.
+// Mismos requisitos que sus pares de página: requireUserApi no exige perfil completo
+// (lo usa la server action del onboarding); requirePermissionApi sí.
 export const requireUserApi = () => requireApi("user");
-export const requireAdminApi = () => requireApi("admin");
+export const requirePermissionApi = (permission: Permission) => requireApi({ permission });

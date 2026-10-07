@@ -32,7 +32,7 @@ node scripts/setup.ts --name <nombre> [--domain <dominio>] [--no-storage] [--no-
 
 `setup.ts` renombra, genera `.env` con `BETTER_AUTH_SECRET`, quita los opcionales
 rechazados, corre `pnpm install`, levanta Postgres, migra y siembra los usuarios de dev
-(`admin@local.test` / `user@local.test`, clave `starter-dev`).
+(`admin@local.test` / `soporte@local.test` / `user@local.test`, clave `starter-dev`).
 Si el puerto 5432 está ocupado por otro proyecto, poner `POSTGRES_PORT` en `.env` (y el
 mismo puerto en `DATABASE_URL`) y repetir con `pnpm db:up && pnpm db:migrate && pnpm db:seed:dev`.
 

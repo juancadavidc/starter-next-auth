@@ -10,12 +10,19 @@ monorepo pnpm/Turborepo. Ver `README.md` para arrancar.
 - Los scripts de `scripts/` corren con `node scripts/x.ts`: solo sintaxis borrable (sin
   `enum`, `namespace` ni parameter properties) e imports relativos con `.ts`.
 - **Cada página protegida llama a su guard** (`requireUser`, `requireCompletedProfile`,
-  `requireAdmin`). Los layouts no protegen. `proxy.ts` es solo una redirección optimista.
+  `requirePermission("x.y")`); server actions y route handlers, a su par `*Api`. Los
+  layouts no protegen. `proxy.ts` es solo una redirección optimista.
+- **Autorización por permisos, nunca por nombre de rol.** No compares `user.role ===
+  "admin"`: usa `requirePermission*` o `hasPermission`. Los roles son datos (tablas `role` y
+  `role_permission`, editables en `/admin/roles`); los permisos, código
+  (`packages/auth/src/permissions.ts`). `admin` los tiene todos por código.
 - **Migraciones solo aditivas.** Nunca edites ni borres un `.sql` de
   `packages/db/migrations/`: agrega uno nuevo.
 - `next build` nunca toca Postgres.
-- **Roles y baneos solo por `apps/web/src/lib/admin-users.ts`**, que impide que un admin
-  se quite el rol o se banee a sí mismo. Los endpoints HTTP del plugin admin de Better
+- **Roles y baneos solo por `apps/web/src/lib/admin-users.ts`; roles y sus permisos solo
+  por `apps/web/src/lib/admin-roles.ts`.** Aplican las reglas: nadie se cambia el rol, se
+  banea ni edita su propio rol, y nadie otorga (ni toca a quien tiene) permisos que no
+  tiene. Los endpoints HTTP del plugin admin de Better
   Auth (`/api/auth/admin/*`: `set-role`, `ban-user`, `impersonate-user`, `create-user`,
   `set-user-password`…) se saltan esa regla, por eso están apagados con `disabledPaths`
   (`DISABLED_ADMIN_PATHS` en `packages/auth/src/server.ts`). No los reactives ni uses
@@ -28,7 +35,10 @@ monorepo pnpm/Turborepo. Ver `README.md` para arrancar.
 ## Dónde va cada cosa
 
 - Reglas de acceso: `packages/auth/src/access.ts` (pura) y guards en `guards.ts`.
-- Tablas nuevas: `packages/db/src/schema/app.ts` → `pnpm db:generate`.
+- Permisos nuevos: entrada en `PERMISSIONS` (`packages/auth/src/permissions.ts`) + el guard
+  que lo exige. Lecturas de roles: `packages/auth/src/role-store.ts`.
+- Tablas nuevas: `packages/db/src/schema/app.ts` → `pnpm db:generate`. (`auth.ts` y
+  `rbac.ts` son de la plantilla.)
 - Componentes: `pnpm dlx shadcn@latest add <x> --cwd packages/ui`.
 - Caché de datos: `apps/web/src/lib/cache.ts` (único lugar con `unstable_cache`).
 - Variables nuevas: getter en `packages/env/src/index.ts` + `.env.example` +

@@ -6,9 +6,11 @@ GitHub Actions → GHCR → Coolify.
 
 ## Qué trae
 
-- Login con Google; en desarrollo, atajos "Entrar como admin/user" sin OAuth.
-- Roles `admin` / `user`. El primer admin sale de `ADMIN_EMAILS` (solo al crear la
-  cuenta); después, `/admin/users`.
+- Login con Google; en desarrollo, atajos "Entrar como Administrador/Soporte/Usuario" sin
+  OAuth.
+- Roles dinámicos con permisos: se crean y editan en `/admin/roles` y se asignan en
+  `/admin/users`. `admin` y `user` vienen de fábrica; el primer admin sale de
+  `ADMIN_EMAILS` (solo al crear la cuenta). Ver [Roles y permisos](#roles-y-permisos).
 - Onboarding mínimo (nombre) con guard: nadie entra a `/app` sin perfil completo.
 - Migraciones Drizzle que se aplican al arrancar el contenedor, con advisory lock.
 - shadcn/ui con tokens claro/oscuro; `brand-lint` prohíbe colores crudos.
@@ -62,7 +64,7 @@ pnpm install
 pnpm db:up               # Postgres 17 en :5432 (POSTGRES_PORT en .env para cambiarlo
                           # si el puerto ya está ocupado por otro proyecto)
 pnpm db:migrate
-pnpm db:seed:dev         # admin@local.test / user@local.test, clave starter-dev
+pnpm db:seed:dev         # admin@ / soporte@ / user@local.test, clave starter-dev
 pnpm dev                 # http://localhost:3000
 ```
 
@@ -85,7 +87,7 @@ obligatorios (sin ellos el server no arranca).
 | `apps/web` | La app Next (App Router, `proxy.ts`, server actions) |
 | `packages/env` | Variables de entorno fail-fast |
 | `packages/db` | Schema, migraciones, cliente y `runMigrations()` |
-| `packages/auth` | Better Auth, roles, guards, login de dev |
+| `packages/auth` | Better Auth, roles y permisos, guards, login de dev |
 | `packages/ui` | shadcn/ui y tokens de marca |
 | `docker/` | Dockerfile y entrypoint (migrar → servir) |
 | `scripts/` | `setup.ts`, `brand-lint.ts`, `check-migrations.ts` |
@@ -179,6 +181,32 @@ publica ni despliega nada.
 
 El contenedor aplica las migraciones al arrancar; si fallan, no arranca.
 `SKIP_MIGRATIONS=1` permite entrar a mirar sin tocar la base.
+
+## Roles y permisos
+
+Cada usuario tiene **un rol** (`user.role`) y cada rol, un conjunto de **permisos**.
+
+- **Permisos**: catálogo en código, `packages/auth/src/permissions.ts` (`users.view`,
+  `users.manage`, `roles.manage`). Un permiso solo existe si un guard lo revisa, por eso
+  no se crean desde la UI.
+- **Roles**: datos en las tablas `role` y `role_permission`. Se gestionan en
+  `/admin/roles` (permiso `roles.manage`). `admin` tiene todos los permisos por código y no
+  se edita; `user` es el rol de toda cuenta nueva (sin permisos de administración, pero
+  editable). Ninguno de los dos se borra, ni un rol con usuarios asignados.
+- **Asignación**: `/admin/users` (ver: `users.view`; cambiar rol y suspender:
+  `users.manage`).
+- **Anti-escalada**: nadie cambia su propio rol, se suspende ni edita su rol; solo se
+  otorgan (o se gestiona a quien tiene) permisos que uno mismo tiene, y el rol `admin`
+  solo lo da o lo quita otro admin. Las reglas viven en `apps/web/src/lib/admin-users.ts`
+  y `apps/web/src/lib/admin-roles.ts`, con tests.
+- Los permisos se leen en cada petición: editar un rol aplica en el acto, sin re-login.
+
+Para proteger algo nuevo con un permiso:
+
+1. Agrégalo a `PERMISSIONS` en `packages/auth/src/permissions.ts`.
+2. Página: `await requirePermission("x.y", "/ruta")`. Server action o route handler:
+   `await requirePermissionApi("x.y")`. UI condicional: `hasPermission(user, "x.y")`.
+3. Dale el permiso a los roles que correspondan en `/admin/roles` (admin ya lo tiene).
 
 ## Recuperar acceso de admin
 
