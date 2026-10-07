@@ -1,6 +1,7 @@
 // Tablas de Better Auth (núcleo + plugin admin) y el campo propio `profileCompleted`.
 // Si cambias campos aquí, revisa `additionalFields` en packages/auth/src/server.ts.
 import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { role } from "./rbac";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -13,7 +14,11 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
-  role: text("role").default("user").notNull(),
+  // Rol dinámico (tabla role). Un rol con usuarios no se puede borrar.
+  role: text("role")
+    .default("user")
+    .notNull()
+    .references(() => role.key, { onDelete: "restrict" }),
   banned: boolean("banned").default(false),
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires"),

@@ -7,6 +7,7 @@ const base: SessionUser = {
   name: "Ana",
   image: null,
   role: "user",
+  permissions: [],
   banned: false,
   profileCompleted: true,
 };
@@ -25,7 +26,7 @@ describe("decideAccess", () => {
   });
 
   it("blocks banned users on every requirement", () => {
-    for (const req of ["user", "completed-profile", "admin"] as const) {
+    for (const req of ["user", "completed-profile", { permission: "users.view" }] as const) {
       expect(decideAccess({ ...base, banned: true, role: "admin" }, req)).toEqual({
         ok: false,
         status: 403,
@@ -46,18 +47,24 @@ describe("decideAccess", () => {
     });
   });
 
-  it("requires a completed profile for admins too", () => {
+  it("requires a completed profile before checking permissions", () => {
     expect(
-      decideAccess({ ...base, role: "admin", profileCompleted: false }, "admin"),
+      decideAccess({ ...base, permissions: ["users.view"], profileCompleted: false }, { permission: "users.view" }),
     ).toMatchObject({ ok: false, redirectTo: "/onboarding" });
   });
 
-  it("rejects non-admins from admin", () => {
-    expect(decideAccess(base, "admin")).toEqual({ ok: false, status: 403, redirectTo: "/app" });
+  it("rejects users without the permission", () => {
+    expect(decideAccess({ ...base, permissions: ["users.view"] }, { permission: "roles.manage" })).toEqual({
+      ok: false,
+      status: 403,
+      redirectTo: "/app",
+    });
   });
 
-  it("allows admins", () => {
-    expect(decideAccess({ ...base, role: "admin" }, "admin")).toEqual({ ok: true });
+  it("allows users whose role grants the permission, whatever the role is called", () => {
+    expect(
+      decideAccess({ ...base, role: "soporte", permissions: ["users.view"] }, { permission: "users.view" }),
+    ).toEqual({ ok: true });
   });
 });
 
@@ -80,14 +87,24 @@ describe("toSessionUser", () => {
       name: "Ana",
       image: "https://img.test/a.png",
       role: "admin",
+      permissions: ["users.view", "users.manage", "roles.manage"],
       banned: true,
       profileCompleted: true,
     });
   });
 
-  it("falls back to the safest values when fields are missing or unknown", () => {
-    expect(
-      toSessionUser({ id: "u1", email: "a@example.com", name: "Ana", role: "root", banned: null }),
-    ).toEqual({ ...base, profileCompleted: false });
+  it("resolves a custom role's stored permissions, ignoring unknown ones", () => {
+    const u = toSessionUser({ id: "u1", email: "a@example.com", name: "Ana", role: "soporte" }, [
+      "users.view",
+      "legacy.permission",
+    ]);
+    expect(u).toMatchObject({ role: "soporte", permissions: ["users.view"] });
+  });
+
+  it("falls back to the safest values when fields are missing", () => {
+    expect(toSessionUser({ id: "u1", email: "a@example.com", name: "Ana", role: null, banned: null })).toEqual({
+      ...base,
+      profileCompleted: false,
+    });
   });
 });

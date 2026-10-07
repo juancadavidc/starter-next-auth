@@ -4,12 +4,14 @@
   "type": "module",
   "exports": {
     "./roles": "./src/roles.ts",
+    "./permissions": "./src/permissions.ts",
     "./api-error": "./src/api-error.ts",
     "./safe-next": "./src/safe-next.ts",
     "./access": "./src/access.ts",
     "./dev-login": "./src/dev-login.ts",
     "./server": "./src/server.ts",
     "./session": "./src/session.ts",
+    "./role-store": "./src/role-store.ts",
     "./guards": "./src/guards.ts",
     "./client": "./src/client.ts"
   },

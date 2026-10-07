@@ -1,11 +1,13 @@
-import { isRole, type Role } from "./roles";
+import { resolvePermissions, type Permission } from "./permissions";
+import { DEFAULT_ROLE } from "./roles";
 
 export type SessionUser = {
   id: string;
   email: string;
   name: string;
   image: string | null;
-  role: Role;
+  role: string;
+  permissions: Permission[];
   banned: boolean;
   profileCompleted: boolean;
 };
@@ -21,26 +23,29 @@ export type AuthUserLike = {
   profileCompleted?: boolean | null;
 };
 
-// Único punto que traduce el usuario de Better Auth a SessionUser. Ante valores
-// ausentes o desconocidos elige lo más restrictivo: rol "user", perfil incompleto.
-export function toSessionUser(u: AuthUserLike): SessionUser {
+// Único punto que traduce el usuario de Better Auth a SessionUser. `storedPermissions` son
+// las filas de role_permission de su rol (las lee session.ts). Ante valores ausentes o
+// desconocidos elige lo más restrictivo: rol por defecto, sin permisos, perfil incompleto.
+export function toSessionUser(u: AuthUserLike, storedPermissions: readonly string[] = []): SessionUser {
+  const role = u.role || DEFAULT_ROLE;
   return {
     id: u.id,
     email: u.email,
     name: u.name,
     image: u.image ?? null,
-    role: isRole(u.role) ? u.role : "user",
+    role,
+    permissions: resolvePermissions(role, storedPermissions),
     banned: Boolean(u.banned),
     profileCompleted: Boolean(u.profileCompleted),
   };
 }
 
-export type Requirement = "user" | "completed-profile" | "admin";
+export type Requirement = "user" | "completed-profile" | { permission: Permission };
 
 export type AccessDecision = { ok: true } | { ok: false; status: 401 | 403; redirectTo: string };
 
 // Decisión pura de acceso: la usan tanto los guards de página (redirect) como los de API
-// (ApiError). El orden importa: sesión → baneo → perfil → rol.
+// (ApiError). El orden importa: sesión → baneo → perfil → permiso.
 export function decideAccess(
   user: SessionUser | null,
   requirement: Requirement,
@@ -53,7 +58,7 @@ export function decideAccess(
   if (user.banned) return { ok: false, status: 403, redirectTo: "/login?error=banned" };
   if (requirement === "user") return { ok: true };
   if (!user.profileCompleted) return { ok: false, status: 403, redirectTo: "/onboarding" };
-  if (requirement === "admin" && user.role !== "admin") {
+  if (typeof requirement === "object" && !user.permissions.includes(requirement.permission)) {
     return { ok: false, status: 403, redirectTo: "/app" };
   }
   return { ok: true };

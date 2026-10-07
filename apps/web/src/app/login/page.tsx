@@ -4,6 +4,7 @@ import { isDevLoginEnabled } from "@repo/auth/dev-login";
 import { safeNext } from "@repo/auth/safe-next";
 import { isGoogleConfigured } from "@repo/auth/server";
 import { getSessionUser } from "@repo/auth/session";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@repo/ui/components/card";
 import { LoginButtons } from "@/components/login-buttons";
 import { loginErrorMessage } from "@/lib/login-errors";
 
@@ -23,14 +24,21 @@ export default async function LoginPage({ searchParams }: Props) {
   const errorMessage = loginErrorMessage(error);
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-6 px-4">
-      <h1 className="text-2xl font-semibold">Entrar</h1>
-      {errorMessage && (
-        <p role="alert" className="text-sm text-destructive">
-          {errorMessage}
-        </p>
-      )}
-      <LoginButtons next={target} googleEnabled={isGoogleConfigured()} devLogin={isDevLoginEnabled()} />
+    <main className="flex min-h-dvh items-center justify-center bg-muted/40 px-4 py-10">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Entrar</CardTitle>
+          <CardDescription>Usa tu cuenta de Google para continuar.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {errorMessage && (
+            <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">
+              {errorMessage}
+            </p>
+          )}
+          <LoginButtons next={target} googleEnabled={isGoogleConfigured()} devLogin={isDevLoginEnabled()} />
+        </CardContent>
+      </Card>
     </main>
   );
 }
