@@ -65,7 +65,8 @@ monorepo pnpm/Turborepo. Ver `README.md` para arrancar.
 
 GitHub Actions → GHCR → Coolify (`/coolify-deploy`, `/coolify-debug`). Los workflows
 llaman a los comunes de `juancadavidc/shared-gha-stackless@v1`: `ci.yml` (PR: checks y
-smoke), `staging.yml` (merge a `main` → `:staging` → Coolify staging) y `release.yml`
+smoke), `staging.yml` (merge a `main`, o a mano sobre una rama con
+`gh workflow run staging.yml --ref <rama>` → `:staging` → Coolify staging) y `release.yml`
 (pre-release `vX.Y.Z-rc.N` → `:vX.Y.Z` + `:latest` → Coolify producción). Esos flujos solo
 publican si pasan los checks y el smoke; no agregues un workflow de publicación aparte que
 se los salte. Si hace falta algo que el repo común no cubre, cámbialo allá. Coolify no construye imágenes. Las

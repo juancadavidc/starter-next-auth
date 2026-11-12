@@ -152,7 +152,7 @@ Los workflows son llamadas cortas a
 | Workflow | Cuándo | Qué hace |
 |----------|--------|----------|
 | `ci.yml` | cada PR | checks + smoke test de la imagen |
-| `staging.yml` | merge a `main` | checks + smoke → `ghcr.io/<owner>/<repo>/web:staging` y `:<sha>` → redeploy de **staging** |
+| `staging.yml` | merge a `main`, o a mano sobre una rama | checks + smoke → `ghcr.io/<owner>/<repo>/web:staging` y `:<sha>` → redeploy de **staging** |
 | `release.yml` | pre-release `vX.Y.Z-rc.N` | checks + smoke sobre ese commit → `:vX.Y.Z` y `:latest` → release final `vX.Y.Z` → redeploy de **producción**, espera y health check |
 
 `latest` es solo de producción y solo lo mueve un release. El repo de la plantilla no
@@ -174,7 +174,12 @@ publica ni despliega nada.
    Sin los de staging, `staging.yml` publica la imagen y solo avisa. En producción, un
    secret faltante hace fallar el release. En Settings → Environments → `production`
    puedes exigir aprobación manual antes de cada deploy.
-4. Release a producción:
+4. Probar una rama en staging antes de mergear (mismos checks y smoke que un merge):
+   ```bash
+   gh workflow run staging.yml --ref <rama>    # o Actions → Staging → Run workflow
+   ```
+   La rama queda en staging hasta el próximo merge a `main`.
+5. Release a producción:
    ```bash
    gh release create v1.0.0-rc.1 --prerelease --target main --generate-notes
    ```

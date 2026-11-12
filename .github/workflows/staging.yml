@@ -3,10 +3,18 @@ name: Staging
 # Merge a main → mismos checks y smoke que ci.yml → imagen ghcr.io/<owner>/<repo>/web con
 # tags `staging` y `<sha>` → redeploy de la app de staging en Coolify. `latest` es solo de
 # producción: lo mueve release.yml. Ver juancadavidc/shared-gha-stackless.
+#
+# Desplegar una rama para probarla: Actions → Staging → "Run workflow" y elegir la rama, o
+#   gh workflow run staging.yml --ref <rama>
+# Pasa por los mismos checks y smoke que un merge; si alguno falla no se publica nada. La
+# rama queda en staging hasta el próximo merge a main (o el próximo deploy manual).
+
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Deploy de rama {0}', github.ref_name) || github.event.head_commit.message }}
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 # Un merge nuevo reemplaza al anterior: solo se publica y despliega el último.
 concurrency:
